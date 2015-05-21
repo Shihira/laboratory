@@ -8,6 +8,7 @@
 #include <type_traits>
 #include <stdexcept>
 #include <cstdint>
+#include <memory>
 
 #include <iostream>
 
@@ -121,9 +122,16 @@ struct json_type_trait<const T*>
 class json_value {
 protected:
         // Uses vtable to store the code to call the destructor of different
-        // type, preventing inaccurate destruction led by `void*` or `free()`.
+        // type, preventing inaccurate destruction led by `void*` or `free()`,
+        // and can produce from another non-typed storage.
         struct storage_notype_ {
+                typedef std::unique_ptr<storage_notype_> base_ptr;
+                json_type_flags type_flag;
+                virtual base_ptr duplicate() = 0;
                 virtual ~storage_notype_() { };
+
+        protected:
+                storage_notype_(json_type_flags f) : type_flag(f) { }
         };
 
         // storage accept only final type (builtin json type) as parameter.
@@ -131,18 +139,24 @@ protected:
         struct storage_ : storage_notype_ {
                 typedef storage_<T> self_type;
                 typedef T storage_type;
-                enum { type_flag = json_type_trait<T>::type_flag };
+                typedef std::unique_ptr<storage_type> storage_pointer;
 
-                storage_type* data = 0;
+                storage_pointer data;
 
                 storage_(const storage_type& other)
-                        { data = new storage_type(other); }
-                virtual ~storage_() { if(data) delete data; };
+                        : storage_notype_(static_cast<json_type_flags>
+                        (json_type_trait<T>::type_flag)),
+                        data(new storage_type(other)) { }
+
+                virtual ~storage_() { };
+
+                virtual base_ptr duplicate() {
+                        return base_ptr(new self_type(*data));
+                }
         };
 
 protected:
-        json_type_flags type_;
-        storage_notype_* value_ = 0;
+        storage_notype_::base_ptr value_;
 
 public:
         ////////////////////////////////////////////////////////////////////////
@@ -157,24 +171,26 @@ public:
         json_value(const json_value& other)
                 { copy(other); }
 
-        ~json_value() { if(value_) delete value_; }
+        ~json_value() { }
 
         ////////////////////////////////////////////////////////////////////////
         // properties
-        json_type_flags type() const { return type_; }
+        json_type_flags type() const { return value_->type_flag; }
 
         template <typename T,
                 typename trait = json_type_trait<T>,
                 typename storage_type = typename trait::storage_type>
         const storage_type& value() const {
-                return *(dynamic_cast<storage_<storage_type>*>(value_)->data);
+                return *(dynamic_cast<storage_<storage_type>*>
+                                (value_.get())->data);
         }
 
         template <typename T,
                 typename trait = json_type_trait<T>,
                 typename storage_type = typename trait::storage_type>
         storage_type& value() {
-                return *(dynamic_cast<storage_<storage_type>*>(value_)->data);
+                return *(dynamic_cast<storage_<storage_type>*>
+                                (value_.get())->data);
         }
 
         // All producing work would be forwarded and done here.
@@ -182,42 +198,13 @@ public:
                 typename trait = json_type_trait<T>,
                 typename storage_type = typename trait::storage_type>
         void assign(const T& other) {
-                if(value_) delete value_;
-                value_ = new storage_<storage_type>(other);
-                type_ = static_cast<json_type_flags>(
-                                storage_<storage_type>::type_flag);
+                value_.reset(new storage_<storage_type>(other));
         }
 
         void copy(const json_value& other) {
                 if(&other == this) return; // important!
-
-                switch(other.type_) {
-                case json_type_string : assign(other.vals()); break;
-                case json_type_integer: assign(other.vali()); break;
-                case json_type_real   : assign(other.valr()); break;
-                case json_type_object : assign(other.valo()); break;
-                case json_type_array  : assign(other.vala()); break;
-                case json_type_boolean: assign(other.valb()); break;
-                case json_type_null   : assign(other.valn()); break;
-                }
+                value_ = other.value_->duplicate();
         }
-
-        // type abbreviation
-        json_string & vals() { return value<json_string >(); }
-        json_integer& vali() { return value<json_integer>(); }
-        json_real   & valr() { return value<json_real   >(); }
-        json_object & valo() { return value<json_object >(); }
-        json_array  & vala() { return value<json_array  >(); }
-        json_boolean& valb() { return value<json_boolean>(); }
-        json_null   & valn() { return value<json_null   >(); }
-
-        const json_string & vals() const { return value<json_string >(); }
-        const json_integer& vali() const { return value<json_integer>(); }
-        const json_real   & valr() const { return value<json_real   >(); }
-        const json_object & valo() const { return value<json_object >(); }
-        const json_array  & vala() const { return value<json_array  >(); }
-        const json_boolean& valb() const { return value<json_boolean>(); }
-        const json_null   & valn() const { return value<json_null   >(); }
 
         ////////////////////////////////////////////////////////////////////////
         // operators
@@ -226,13 +213,13 @@ public:
                 { copy(other); return *this; }
 
         json_value& operator[](json_integer index) {
-                if(type_ != json_type_array)
+                if(type() != json_type_array)
                         throw std::runtime_error("TypeError: Not an array.");
                 return value<json_array>()[index];
         }
 
         json_value& operator[](const json_string& index) {
-                if(type_ != json_type_object)
+                if(type() != json_type_object)
                         throw std::runtime_error("TypeError: Not an object.");
                 return value<json_object>()[index];
         }
@@ -241,13 +228,15 @@ public:
         void operator+=(const T& other) {
                 value<T>() += other;
         }
-
-        json_array& operator+=(const json_array& other) {
-                json_array& self = value<json_array>();
-                self.insert(self.end(), other.begin(), other.end());
-                return self;
-        }
 };
+
+#define S_ value<json_string >()
+#define I_ value<json_integer>()
+#define R_ value<json_real   >()
+#define O_ value<json_object >()
+#define A_ value<json_array  >()
+#define B_ value<json_boolean>()
+#define N_ value<json_null   >()
 
 }
 
@@ -260,14 +249,20 @@ int main()
         json_value b = "Hello ";
         json_value c = json_array({1, 2});
         json_value d = json_object({
-                        {"Key1", 123},
-                        {"Key2", 1.2},
-                        {"Key3", "World"},
+                {"Key1", 123},
+                {"Key2", 1.2},
+                {"Key3", "World"},
         });
 
         json_value z = b;
-        z += d["Key3"].vals();
+        z += d["Key3"].S_;
+        json_value y = a;
+        y += json_integer(d["Key2"].R_);
 
-        cout << b.vals() << endl;
-        cout << z.vals() << endl;
+        d["Key3"] = z;
+        d["Key2"] = y;
+
+        cout << b.S_ << endl;
+        cout << d["Key3"].S_ << endl;
+        cout << d["Key2"].I_ << endl;
 }

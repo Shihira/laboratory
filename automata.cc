@@ -1,9 +1,12 @@
 #include <functional>
+#include <type_traits>
 #include <vector>
 #include <sstream>
 #include <iostream>
 #include <stdexcept>
 
+// EventType is assumed to be a finited (small quantity), and scalar (like
+// charater, int, enumeration, etc.) type.
 template <typename EventType, typename Stream>
 class state_basic {
 public:
@@ -51,72 +54,112 @@ public:
         self_type& transit(event_type e, stream_type& s) {
                 int i = 0;
                 for(auto listener : listeners_) {
-                        printf("%d ", i);
                         if(listener.first(e)) {
                                 return listener.second(e, s);
                         }
                         i++;
                 }
 
-                printf(":-( ");
                 return default_listener_(e, s);
         }
 };
+
+template <typename State>
+class df_automata {
+public:
+        typedef State state_type;
+        typedef typename state_type::event_type event_type;
+        typedef typename state_type::handler_func handler_func;
+        typedef typename state_type::stream_type stream_type;
+
+private:
+        state_type* start_state_ = nullptr;
+        state_type* end_state_ = nullptr;
+
+protected:
+        void start_state(state_type& s) { start_state_ = &s; }
+        void end_state(state_type& s) { end_state_ = &s; }
+
+        static handler_func redirect_to(state_type& to) {
+                return [&](event_type, stream_type&)
+                        -> state_type& { return to; };
+        }
+
+        virtual stream_type& stream() = 0;
+
+public:
+        void run() {
+                state_type* cur_state = start_state_;
+
+                while(cur_state != end_state_) {
+                        event_type cur_event = stream().get();
+                        if(stream().eof()) break;
+                        cur_state = &(cur_state->transit(cur_event, stream()));
+                }
+        }
+};
+
+#define member(func) (std::bind( \
+        &std::remove_pointer<decltype(this)>::type::func, \
+        this, std::placeholders::_1, std::placeholders::_2))
         
 
 typedef state_basic<char, std::stringstream> state;
 
 using namespace std;
 
-state start;
-state after_a;
-state loop_b;
-state loop_c;
-state after_c;
-state finished;
-
-state::handler_func transit_to(state& s) {
-        return [&](char, stringstream&) -> state& { return s; };
-}
-
-int main()
-{
+class re_example : public df_automata<state> {
         // ab+c*a?
         //                        c
         //                       ( )
-        //                     ,- 4
-        //                   ,c    \
+        //                     ,- 4-,
+        //                   ,c     |
         //  1 --a-> 2 --b-> 3 ----> 5 ----> 6
         //   \      |      ( )      \     /
         //    `-> error     b        `-a-'
 
-        bool success = true;
+        state start;
+        state after_a;
+        state loop_b;
+        state loop_c;
+        state after_c;
+        state finished;
 
-        auto error_handler = [&](char, stringstream&) ->state&
-                { success = false; return finished; };
+        stringstream str;
 
-        start.add_listener('a', transit_to(after_a));
-        start.default_listener(error_handler);
-        after_a.add_listener('b', transit_to(loop_b));
-        after_a.default_listener(error_handler);
-        loop_b.add_listener('b', transit_to(loop_b));
-        loop_c.add_listener('c', transit_to(loop_c));
-        loop_b.default_listener(transit_to(after_c));
-        loop_c.add_listener('c', transit_to(loop_c));
-        loop_c.default_listener(transit_to(after_c));
-        after_c.add_listener('a', transit_to(finished));
-        after_c.default_listener(transit_to(finished));
+protected:
+        stream_type& stream() { return str; }
 
-        stringstream str("abbbbba");
-
-        state* cur_state = &start;
-        while(cur_state != &finished) {
-                char cur_event = str.get();
-                if(str.eof()) break;
-                cout << cur_event << endl;
-                cur_state = &(cur_state->transit(cur_event, str));
-                cout << cur_state << ' ' << &finished << endl;
+        state& error_handler(char, stringstream&) {
+                success = false;
+                return finished;
         }
 
-        cout << success << endl;
+public:
+        bool success = true;
+
+        re_example(string s) : str(s) {
+
+                start.add_listener('a', redirect_to(after_a));
+                start.default_listener(member(error_handler));
+                after_a.add_listener('b', redirect_to(loop_b));
+                after_a.default_listener(member(error_handler));
+                loop_b.add_listener('b', redirect_to(loop_b));
+                loop_c.add_listener('c', redirect_to(loop_c));
+                loop_b.default_listener(redirect_to(after_c));
+                loop_c.add_listener('c', redirect_to(loop_c));
+                loop_c.default_listener(redirect_to(after_c));
+                after_c.add_listener('a', redirect_to(finished));
+                after_c.default_listener(redirect_to(finished));
+
+                start_state(start);
+                end_state(finished);
+        }
+};
+
+int main()
+{
+        re_example ree("abbbbba");
+        ree.run();
+        cout << ree.success << endl;
 }

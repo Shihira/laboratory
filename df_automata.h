@@ -94,13 +94,17 @@ protected:
         void end_state(state_type& s) { end_state_ = &s; }
 
         static handler_func redirect_this(state_type& to) {
-                return [&](event_type, stream_type&)
-                        -> state_type& { return to; };
+                return [&](event_type, stream_type&) -> state_type& {
+                        return to;
+                };
         }
 
-        static handler_func redirect_next(state_type& to) {
-                return [&](event_type, stream_type& s)
-                        -> state_type& { s.ignore(); return to; };
+        static handler_func redirect_next(state_type& to, bool no_ws = false) {
+                return [no_ws, &to](event_type, stream_type& s) -> state_type& {
+                        s.ignore();
+                        if(no_ws) s >> std::ws;
+                        return to;
+                };
         }
 
         virtual stream_type& stream() = 0;

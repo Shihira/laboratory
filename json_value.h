@@ -52,6 +52,9 @@ struct json_null {
         constexpr operator T() const { return 0; }
 };
 
+std::ostream& operator<<(std::ostream& os, const json_null&)
+        { os << "null"; return os; }
+
 static const json_null null;
 
 //// is_json_type helpers

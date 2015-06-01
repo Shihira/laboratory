@@ -17,6 +17,7 @@ int main()
                 {"Key2", 1.2},
                 {"Key3", "World"},
         });
+        json_value f = true;
 
         json_value z = b;
         z += d["Key3"].S_;
@@ -29,5 +30,6 @@ int main()
         cout << b.S_ << endl;
         cout << d["Key3"].S_ << endl;
         cout << d["Key2"].I_ << endl;
+        cout << f.B_ << endl;
 }
 

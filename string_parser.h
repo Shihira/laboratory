@@ -5,7 +5,7 @@
  * Copyright (c) Shihira Fung, 2015
  */
 
-#include "dfa_automata.h"
+#include "df_automata.h"
 
 namespace json {
 

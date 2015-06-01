@@ -5,7 +5,7 @@
  * Copyright (c) Shihira Fung, 2015
  */
 
-#include "dfa_automata.h"
+#include "df_automata.h"
 
 #include <cmath>
 #include <stdexcept>
@@ -15,6 +15,7 @@ namespace json {
 using std::stringstream;
 
 class number_parser : public df_automata<state> {
+        friend class value_parser;
 protected:
         virtual stream_type& stream() { return snum_; }
 

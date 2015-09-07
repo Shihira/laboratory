@@ -194,6 +194,8 @@ public:
                 typename trait = json_type_trait<T>,
                 typename storage_type = typename trait::storage_type>
         storage_type& value() {
+                if(trait::type_flag != type())
+                        throw std::runtime_error("Bad type specified.");
                 return *(dynamic_cast<storage_<storage_type>*>
                                 (value_.get())->data);
         }

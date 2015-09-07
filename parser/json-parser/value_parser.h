@@ -1,6 +1,10 @@
 #ifndef VALUE_PARSER_H_INC
 #define VALUE_PARSER_H_INC
 
+/*
+ * Copyright (c) Shihira Fung, 2015
+ */
+
 #include <memory>
 
 #include "json_value.h"

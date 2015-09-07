@@ -84,11 +84,6 @@ final class LocalServerHandler implements AsyncService.AsyncReadHandler {
                 e.printStackTrace();
             }
         }
-
-        @Override
-        public int validOps() {
-            return SelectionKey.OP_CONNECT | SelectionKey.OP_READ;
-        }
     }
     
     @Override
@@ -115,9 +110,6 @@ final class LocalServerHandler implements AsyncService.AsyncReadHandler {
             e.printStackTrace();
         }
     }
-
-    @Override
-    public int validOps() { return SelectionKey.OP_READ; }
 }
 
 public class LocalServer implements AsyncService.AsyncAcceptHandler {
@@ -146,9 +138,5 @@ public class LocalServer implements AsyncService.AsyncAcceptHandler {
             e.printStackTrace();
         }
     }
-
-    @Override
-    public int validOps() { return SelectionKey.OP_ACCEPT; }
-
 }
 

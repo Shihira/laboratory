@@ -8,9 +8,7 @@ import java.nio.channels.SocketChannel;
 
 public class AsyncService implements Runnable {
 
-    private static interface AsyncHandler {
-        int validOps();
-    }
+    private static interface AsyncHandler { }
 
     public static interface AsyncReadHandler extends AsyncHandler {
         void dataArrived(ByteBuffer bbuf);
@@ -23,6 +21,10 @@ public class AsyncService implements Runnable {
 
     public static interface AsyncConnectHandler extends AsyncHandler {
         void established();
+    }
+
+    public static interface AsyncWriteHandler extends AsyncHandler {
+        ByteBuffer writeSome();
     }
 
     private Selector selector = null;
@@ -57,6 +59,14 @@ public class AsyncService implements Runnable {
                         }
                     }
 
+                    if(key.isWritable()) {
+                        AsyncWriteHandler handler = (AsyncWriteHandler) key.attachment();
+                        SocketChannel channel = (SocketChannel) key.channel();
+
+                        ByteBuffer bbuf = handler.writeSome();
+                        channel.write(bbuf);
+                    }
+
                     if(key.isAcceptable()) {
                         AsyncAcceptHandler handler = (AsyncAcceptHandler) key.attachment();
                         ServerSocketChannel channel = (ServerSocketChannel) key.channel();
@@ -84,6 +94,17 @@ public class AsyncService implements Runnable {
     void registerChannel(SelectableChannel channel, AsyncHandler handler)
         throws IOException {
         channel.configureBlocking(false);
-        channel.register(selector, handler.validOps(), handler);
+
+        int validOps = 0;
+        if(handler instanceof AsyncReadHandler)
+            validOps |= SelectionKey.OP_READ;
+        if(handler instanceof AsyncAcceptHandler)
+            validOps |= SelectionKey.OP_ACCEPT;
+        if(handler instanceof AsyncConnectHandler)
+            validOps |= SelectionKey.OP_CONNECT;
+        if(handler instanceof AsyncConnectHandler)
+            validOps |= SelectionKey.OP_CONNECT;
+
+        channel.register(selector, validOps, handler);
     }
 }

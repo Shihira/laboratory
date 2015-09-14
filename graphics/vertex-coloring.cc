@@ -15,13 +15,23 @@ using namespace std;
 
 int main()
 {
-        vector<col<4>> points;
+        ifstream wavefront("assets/teapot.obj");
+        //read_points(wavefront, points, faces, vnormal);
+        model m;
+        m.read(wavefront);
+
+        vector<col<4>>& points = m.vertexes;
         vector<col<4>> projs;
-        vector<col<3>> vnormal;
+        vector<col<3>>& vnormal = m.normals;
         vector<vector<int>> faces;
 
-        ifstream wavefront("assets/teapot.obj");
-        read_points(wavefront, points, faces, vnormal);
+        for(auto _f : m.faces) {
+            vector<int> f;
+            for(auto _fe : _f) {
+                f.push_back(get<0>(_fe));
+            }
+            faces.push_back(f);
+        }
 
         image img(800, 600);
         ofstream fimg("assets/vertex-coloring.ppm");

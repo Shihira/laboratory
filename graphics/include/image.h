@@ -131,8 +131,8 @@ private:
 
 
 public:
-        std::vector<color>& buffer() { return _buf; }
-        const std::vector<color>& buffer() const { return _buf; }
+        buf_type& buffer() { return _buf; }
+        const buf_type& buffer() const { return _buf; }
         size_t width() const { return _w; }
         size_t height() const { return _h; }
         size_t version() const { return _ver; }

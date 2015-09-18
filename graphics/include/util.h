@@ -104,7 +104,7 @@ protected:
             }
         }
 
-        vertexes.push_back(v);
+        vertices.push_back(v);
     }
 
     void read_vt(const std::string& str_vt) {
@@ -172,9 +172,9 @@ protected:
             }
 
             f.push_back(_face_elem(
-                    static_cast<size_t>(v  >= 0 ? v  - 1 : vertexes.size() + v ),
-                    static_cast<size_t>(vn >= 0 ? vn - 1 : vertexes.size() + vn),
-                    static_cast<size_t>(vt >= 0 ? vt - 1 : vertexes.size() + vt)
+                    static_cast<size_t>(v  >= 0 ? v  - 1 : vertices.size() + v ),
+                    static_cast<size_t>(vn >= 0 ? vn - 1 : vertices.size() + vn),
+                    static_cast<size_t>(vt >= 0 ? vt - 1 : vertices.size() + vt)
                 ));
 
             start_i = std::find_if(space_i, str_f.end(), [] (char c) {
@@ -189,7 +189,7 @@ public:
     typedef std::tuple<vertex, normal, texture> face_elem;
     typedef std::vector<face_elem> face;
 
-    std::vector<vertex> vertexes;
+    std::vector<vertex> vertices;
     std::vector<texture> textures;
     std::vector<normal> normals;
     std::vector<_face> faces;
@@ -198,7 +198,7 @@ public:
 
     void read(std::istream& fin, bool ignore = false) {
         name.clear();
-        vertexes.clear();
+        vertices.clear();
         normals.clear();
         textures.clear();
         faces.clear();
@@ -247,8 +247,8 @@ public:
             normal n;
             texture t;
 
-            if(vertexes.size() > std::get<0>(fe))
-                v = vertexes[std::get<0>(fe)];
+            if(vertices.size() > std::get<0>(fe))
+                v = vertices[std::get<0>(fe)];
             if(normals.size() > std::get<1>(fe))
                 n = normals[std::get<1>(fe)];
             if(textures.size() > std::get<2>(fe))
@@ -264,9 +264,9 @@ public:
     typedef enum { avr_x = 0, avr_y = 1, avr_z = 2 } stat_item;
     double statistic(stat_item item) {
         double sum = 0;
-        for(vertex& v : vertexes)
+        for(vertex& v : vertices)
             sum += v[static_cast<size_t>(item)];
-        return sum / vertexes.size();
+        return sum / vertices.size();
     }
 };
 
@@ -276,6 +276,6 @@ public:
                 for(int lp = 0; lp < repeat; lp++) { code; } \
                 printf("ln.%d used: %ld us\n", __LINE__, clock() - est_t); \
         }
-#define EST_M(code) EST(code, 10000)
+#define EST_10K(code) EST(code, 10000)
 
 #endif

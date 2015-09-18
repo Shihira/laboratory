@@ -34,36 +34,49 @@
 //     c = 0x77ffffff; // and 4-byte unsigned integer is allowed for sure
 
 struct color {
-        uint8_t r;
-        uint8_t g;
         uint8_t b;
+        uint8_t g;
+        uint8_t r;
         uint8_t a;
 
-        color() : r(255), g(255), b(255), a(255) { }
-        color(uint32_t red, uint32_t green, uint32_t blue, uint32_t alpha = 255)
-                : r(red > 255 ? 255 : red),
-                  g(green > 255 ? 255 : green),
-                  b(blue > 255 ? 255 : blue),
-                  a(alpha > 255 ? 255 : alpha) { }
+        color() { operator=(0xffffffff); }
+        color(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha = 255)
+                : b(blue), g(green), r(red), a(alpha) { }
         color(uint32_t pxl) { operator=(pxl); }
 
         color& operator=(uint32_t pxl) {
-                uint8_t* arr = (uint8_t*)&pxl;
-
-                r = arr[0];
-                g = arr[1];
-                b = arr[2];
-                a = arr[3];
-
-                return *this;
+            *reinterpret_cast<uint32_t*>(this) = pxl;
+            return *this;
         }
 
         uint32_t value() const {
-                return (uint32_t)a << 24 |
-                       (uint32_t)r << 16 |
-                       (uint32_t)g << 8  |
-                       (uint32_t)b;
+            return *reinterpret_cast<uint32_t const *>(this);
+        }
 
+        color operator+(const color& c) const {
+            // our opacity, their opacity and complementary their opacity
+            return blend(c, c.a / 255.0);
+        }
+
+        color blend(const color& c, double topc) const {
+            // Blending is low performance
+            return color(
+                    r + (c.r - r) * topc,
+                    g + (c.g - g) * topc,
+                    b + (c.b - b) * topc,
+                    a + (c.a - a) * topc
+                );
+        }
+
+        static color from_arithematic(uint32_t red, uint32_t green,
+                uint32_t blue, uint32_t alpha = 255) {
+
+            return color(
+                    blue > 255 ? 255 : blue,
+                    green > 255 ? 255 : green,
+                    red > 255 ? 255 : red,
+                    alpha > 255 ? 255 : alpha
+                );
         }
 };
 

@@ -31,10 +31,10 @@ int main(int argc, char** argv)
 
     GLuint dplist = glGenLists(1);
     glNewList(dplist, GL_COMPILE);
-    glBegin(GL_TRIANGLES);
 
     for(size_t i = 0; i < m.size(); i++) {
         model::face f = m.at(i);
+        glBegin(GL_POLYGON);
         for(model::face_elem& fe : f) {
             model::vertex v;
             model::normal n;
@@ -44,9 +44,8 @@ int main(int argc, char** argv)
             glNormal3d(n[0], n[1], n[2]);
             glVertex4d(v[0], v[1], v[2], v[3]);
         }
+        glEnd();
     }
-
-    glEnd();
     glEndList();
 
     double avr_x = m.statistic(model::avr_x);

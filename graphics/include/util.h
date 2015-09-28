@@ -7,6 +7,7 @@
 #include <cmath>
 #include <iostream>
 #include <sstream>
+#include <algorithm>
 #include <cstdio>
 
 #include "matrix.h"
@@ -83,11 +84,12 @@ public:
     typedef col<3> normal;
     typedef col<3> texture;
 
+    typedef std::tuple<size_t, size_t, size_t> face_elem;
+    typedef std::vector<face_elem> face;
+
 protected:
     // _face_elem uses integer to index faces
     // and face_elem contains actual vertex/normal/texture information
-    typedef std::tuple<size_t, size_t, size_t> _face_elem;
-    typedef std::vector<_face_elem> _face;
 
     void read_v(const std::string& str_v) {
         vertex v;
@@ -139,7 +141,7 @@ protected:
     }
 
     void read_f(const std::string& str_f) {
-        _face f;
+        face f;
 
         // 3 choices for face element:
         //   i. v1 v2 v3 ...
@@ -155,12 +157,12 @@ protected:
             std::string str_fe(start_i, space_i);
 
             if(str_fe.find("//") != str_fe.npos) { // ii.
-                int assigned = std::sscanf(str_fe.c_str(), "%d//%d", &v, &vt);
+                int assigned = std::sscanf(str_fe.c_str(), "%d//%d", &v, &vn);
                 if(assigned != 2)
                     throw std::runtime_error("Bad obj");
-                vn = v;
+                vt = v;
             } else if(str_fe.find('/') != str_fe.npos) { // iii.
-                int assigned = std::sscanf(str_fe.c_str(), "%d/%d/%d", &v, &vn, &vt);
+                int assigned = std::sscanf(str_fe.c_str(), "%d/%d/%d", &v, &vt, &vn);
                 if(assigned != 3)
                     throw std::runtime_error("Bad obj");
             } else { // i.
@@ -171,7 +173,7 @@ protected:
                 vt = v;
             }
 
-            f.push_back(_face_elem(
+            f.push_back(face_elem(
                     static_cast<size_t>(v  >= 0 ? v  - 1 : vertices.size() + v ),
                     static_cast<size_t>(vn >= 0 ? vn - 1 : vertices.size() + vn),
                     static_cast<size_t>(vt >= 0 ? vt - 1 : vertices.size() + vt)
@@ -186,13 +188,10 @@ protected:
     }
 
 public:
-    typedef std::tuple<vertex, normal, texture> face_elem;
-    typedef std::vector<face_elem> face;
-
     std::vector<vertex> vertices;
     std::vector<texture> textures;
     std::vector<normal> normals;
-    std::vector<_face> faces;
+    std::vector<face> faces;
 
     std::string name;
 
@@ -238,35 +237,34 @@ public:
         }
     }
 
-    face at(size_t i) {
-        _face& _f = faces[i];
-        face f;
+    typedef enum {
+        avr_x = 0, avr_y = 1, avr_z = 2,
+        min_x = 3, min_y = 4, min_z = 5,
+        max_x = 6, max_y = 7, max_z = 9,
+    } stat_item;
+    double statistic(stat_item item) {
+        double ret;
 
-        for(_face_elem& fe : _f) {
-            vertex v;
-            normal n;
-            texture t;
-
-            if(vertices.size() > std::get<0>(fe))
-                v = vertices[std::get<0>(fe)];
-            if(normals.size() > std::get<1>(fe))
-                n = normals[std::get<1>(fe)];
-            if(textures.size() > std::get<2>(fe))
-                t = textures[std::get<2>(fe)];
-            f.push_back(face_elem(v, n, t));
+        switch(item) {
+        case avr_x: case avr_y: case avr_z:
+            ret = 0.0;
+            for(vertex& v : vertices)
+                ret += v[static_cast<size_t>(item)];
+            ret /= vertices.size();
+            break;
+        case min_x: case min_y: case min_z:
+            ret = vertices[0][static_cast<size_t>(item) - 3];
+            for(vertex& v : vertices)
+                ret = std::min(ret, v[static_cast<size_t>(item) - 3]);
+            break;
+        case max_x: case max_y: case max_z:
+            ret = vertices[0][static_cast<size_t>(item) - 3];
+            for(vertex& v : vertices)
+                ret = std::max(ret, v[static_cast<size_t>(item) - 3]);
+            break;
         }
 
-        return f;
-    }
-
-    size_t size() { return faces.size(); }
-
-    typedef enum { avr_x = 0, avr_y = 1, avr_z = 2 } stat_item;
-    double statistic(stat_item item) {
-        double sum = 0;
-        for(vertex& v : vertices)
-            sum += v[static_cast<size_t>(item)];
-        return sum / vertices.size();
+        return ret;
     }
 };
 

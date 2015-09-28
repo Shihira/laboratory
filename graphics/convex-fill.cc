@@ -103,9 +103,6 @@ void convex_fill(const vector<vertex_info>& v, image& img) {
             return e1.f->p.y < e2.f->p.y; });
 
     vector<active_edge> active_edges;
-    auto heap_cmp = [](const active_edge& ae1, const active_edge& ae2) {
-                return ae1.x > ae2.x; };
-    make_heap(active_edges.begin(), active_edges.end(), heap_cmp);
     auto cur_edge = edges.begin();
     
     for(size_t y = edges.front().f->p.y; y < edges.back().t->p.y; y++) {

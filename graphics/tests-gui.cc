@@ -32,14 +32,14 @@ int main(int argc, char** argv)
     GLuint dplist = glGenLists(1);
     glNewList(dplist, GL_COMPILE);
 
-    for(size_t i = 0; i < m.size(); i++) {
-        model::face f = m.at(i);
+    for(model::face& f : m.faces) {
         glBegin(GL_POLYGON);
         for(model::face_elem& fe : f) {
-            model::vertex v;
-            model::normal n;
-            model::texture t;
-            std::tie(v, n, t) = fe;
+            size_t v_i, n_i, t_i;
+            std::tie(v_i, n_i, t_i) = fe;
+
+            model::normal& n = m.normals[n_i];
+            model::vertex& v = m.vertices[v_i];
 
             glNormal3d(n[0], n[1], n[2]);
             glVertex4d(v[0], v[1], v[2], v[3]);
@@ -73,7 +73,7 @@ int main(int argc, char** argv)
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
         gluPerspective(60, 1.33, 100, 5000);
-        gluLookAt(0, 0, -500, 0, 0, 0, 0, 1, 0);
+        gluLookAt(0, 0, -400, 0, 0, 0, 0, 1, 0);
 
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();

@@ -45,10 +45,28 @@ public:
                 return sqrt((*this) * (*this));
         }
 
+        template<size_t N_>
+        col<N_> to_vec() const {
+            col<N_> c;
+            for(size_t i = 0; i < N_; i++) {
+                if(i < M_) c[i] = (*this)[i];
+                else c[i] = 0;
+            }
+            return c;
+        }
+
         col<M_-1> reduce() const {
                 col<M_-1> result;
                 for(size_t i = 0; i < M_ - 1; i++)
                         result[i] = (*this)[i] / (*this)[M_ - 1];
+                return result;
+        }
+
+        col<M_+1> homo() const {
+                col<M_+1> result;
+                for(size_t i = 0; i < M_; i++)
+                        result[i] = (*this)[i];
+                result[M_] = 1.0;
                 return result;
         }
 
@@ -95,6 +113,17 @@ public:
         }
 };
 
+template<size_t M_>
+std::ostream& operator<< (std::ostream& os, const col<M_>& c)
+{
+    os << '[';
+    for(size_t i = 0; i < M_; i++)
+        os << c[i] << (i == M_ - 1 ? "" : ", ");
+    os << ']';
+
+    return os;
+}
+
 template <size_t M_>
 inline double det(const matrix<M_, M_>& mat);
 
@@ -122,6 +151,16 @@ public:
                         new_mat(i, j) += (*this)(i, k) * other(k, j);
 
                 return new_mat;
+        }
+
+        template <size_t L_>
+        matrix<M_, L_> operator*= (const matrix<N_, L_>& other) {
+                for(size_t i = 0; i < M_; ++i)
+                for(size_t j = 0; j < L_; ++j)
+                for(size_t k = 0; k < N_; ++k)
+                        (*this)(i, j) += (*this)(i, k) * other(k, j);
+
+                return *this;
         }
 
         matrix() { }
@@ -207,6 +246,70 @@ std::ostream& operator<< (std::ostream& s, const matrix<M_, N_>& mat) {
         }
 
         return s;
+}
+
+namespace transform {
+
+typedef enum { xOy, yOz, zOx } plane;
+
+inline matrix<4, 4> diagonal(col<4> diag)
+{
+    return matrix<4, 4>{
+        diag[0], 0, 0, 0,
+        0, diag[1], 0, 0,
+        0, 0, diag[2], 0,
+        0, 0, 0, diag[3],
+    };
+}
+
+inline matrix<4, 4> rotate(double a, plane p)
+{
+    if(p == xOy)
+        return matrix<4, 4>{
+            cos(a),-sin(a), 0, 0,
+            sin(a), cos(a), 0, 0,
+            0,      0,      1, 0,
+            0,      0,      0, 1,
+        };
+    else if(p == yOz)
+        return matrix<4, 4>{
+            1, 0,      0,      0,
+            0, cos(a), sin(a), 0,
+            0,-sin(a), cos(a), 0,
+            0, 0,      0,      1,
+        };
+    else
+        return matrix<4, 4>{
+            cos(a), 0,-sin(a), 0,
+            0,      1, 0,      0,
+            sin(a), 0, cos(a), 0,
+            0,      0, 0,      1,
+        };
+}
+
+inline matrix<4, 4> translate(col<4> t)
+{
+    return matrix<4, 4>{
+        t[3], 0,    0,    t[0],
+        0,    t[3], 0,    t[1],
+        0,    0,    t[3], t[2],
+        0,    0,    0,    t[3],
+    };
+}
+
+inline matrix<4, 4> scale(double x, double y, double z)
+    { return diagonal({x, y, z, 1}); }
+
+inline matrix<4, 4> identity()
+    { return diagonal({1, 1, 1, 1}); }
+
+/*
+inline matrix<4, 4> perspective(double z_retina)
+{
+
+}
+*/
+
 }
 
 #endif

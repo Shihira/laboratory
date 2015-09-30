@@ -143,7 +143,7 @@ public:
                 { cols_ = other.cols_; return (*this); }
 
         template <size_t L_>
-        matrix<M_, L_> operator* (const matrix<N_, L_>& other) {
+        matrix<M_, L_> operator* (const matrix<N_, L_>& other) const {
                 matrix<M_, L_> new_mat;
                 for(size_t i = 0; i < M_; ++i)
                 for(size_t j = 0; j < L_; ++j)
@@ -155,12 +155,8 @@ public:
 
         template <size_t L_>
         matrix<M_, L_> operator*= (const matrix<N_, L_>& other) {
-                for(size_t i = 0; i < M_; ++i)
-                for(size_t j = 0; j < L_; ++j)
-                for(size_t k = 0; k < N_; ++k)
-                        (*this)(i, j) += (*this)(i, k) * other(k, j);
-
-                return *this;
+            (*this) = operator* (other);
+            return *this;
         }
 
         matrix() { }
@@ -195,6 +191,26 @@ public:
                 }
 
                 return det(new_mat);
+        }
+
+        matrix inverse() const {
+            double D = det(*this);
+
+            matrix new_mat;
+            for(size_t i = 0; i < M_; ++i)
+            for(size_t j = 0; j < N_; ++j)
+                new_mat(j, i) = ((i + j) % 2 ? -1 : 1) * cofactor(i, j) / D;
+
+            return new_mat;
+        }
+
+        matrix<N_, M_> t() const {
+            matrix<N_, M_> new_mat;
+            for(size_t i = 0; i < M_; ++i)
+            for(size_t j = 0; j < N_; ++j)
+                new_mat(j, i) = (*this)(i, j);
+
+            return new_mat;
         }
 
 };

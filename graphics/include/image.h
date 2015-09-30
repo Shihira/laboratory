@@ -72,9 +72,9 @@ struct color {
                 uint32_t blue, uint32_t alpha = 255) {
 
             return color(
-                    blue > 255 ? 255 : blue,
-                    green > 255 ? 255 : green,
                     red > 255 ? 255 : red,
+                    green > 255 ? 255 : green,
+                    blue > 255 ? 255 : blue,
                     alpha > 255 ? 255 : alpha
                 );
         }

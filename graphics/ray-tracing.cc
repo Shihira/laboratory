@@ -9,87 +9,187 @@
 
 using namespace std;
 
-bool is_inside(const vector<col<4>>& points, col<4> pt_test)
-{
-    /*
-    if(pt_test[0] <= 1 && pt_test[2] <= 1 &&
-        pt_test[0] >= -1 && pt_test[2] >= -1)
-        return true;
-    else return false;
-    */
+#define F faces[face_i]
+#define FN fnormals[face_i]
+#define FC fcolors[face_i]
+#define V(fe) vertices[std::get<0>(fe)]
+#define VN(fe) normals[std::get<1>(fe)]
 
-    col<3> center = points[0].reduce(); // center point
-    col<3> v3 = pt_test.reduce() - center;
+class renderer : public model {
+public:
+    image& img;
 
-    bool ret = false;
+    vector<col<3>> fnormals;
+    col<4> light;
+    vector<color> fcolors;
 
-    for(size_t p1 = 1, p2 = 2; p2 < points.size(); p1++, p2++) {
-        col<3> v1 = points[p1].reduce() - center,
-               v2 = points[p2].reduce() - center;
-
-        double a = (v1 * v2) * (v3 * v2) - (v2 * v2) * (v3 * v1);
-        double b = (v2 * v1) * (v3 * v1) - (v1 * v1) * (v3 * v2);
-        double c = (v1 * v2) * (v1 * v2) - (v1 * v1) * (v2 * v2);
-
-        a /= c; b /= c;
-
-        ret |= (a >= 0 && b >= 0 && a + b <= 1);
+    renderer(ifstream& fin, image& _img)
+        : img(_img), light{0, 0, 0, 1} {
+        read(fin);
     }
 
-    return ret;
-}
+    void _gen_fnormals() {
+        for(face& f : faces) {
+            assert(f.size() >= 3);
 
-double intersection(const vector<col<4>>& points,
-        const col<3>& dire, const col<4>& sp)
-{
-    // finding the normal vector of a plane requires at most 3 vertices
-    col<3> v1 = (points[1] - points[0]).to_vec<3>(),
-           v2 = (points[2] - points[1]).to_vec<3>();
+            col<3> v1 = V(f[1]).reduce() - V(f[0]).reduce();
+            col<3> v2 = V(f[2]).reduce() - V(f[1]).reduce();
 
-    col<3> n = v1 % v2; // outer product/normal
-    //    (x - p0)n = 0; x = sp + a dire;
-    // => a = (- sp n + p0 n) / dire n
-    double a = (-sp.reduce() * n + points[0].reduce() * n) / (dire * n);
-    //cout << sp.reduce() << " + " << a << " * " << dire << endl;
-    // radial line: only faces intersect with ray in positive direction count
-
-    return a;
-}
-
-const model::face* find_intersection(const model& m,
-        const col<3>& dire, const col<4>& sp, double& min_a)
-{
-    min_a = 1e8;
-    const model::face* inter_f = nullptr;
-
-    for(const model::face& f : m.faces) {
-        vector<col<4>> vs;
-        for(const model::face_elem& fe : f)
-            vs.push_back(m.vertices[get<0>(fe)]);
-
-        double a = intersection(vs, dire, sp);
-
-        //cout << "a: " << a << endl;
-
-        if(a < 0 || a > min_a) continue;
-
-        col<4> inter_p = (sp.reduce() + dire * a).homo();
-        if(!is_inside(vs, inter_p)) continue;
-
-        min_a = a;
-        inter_f = &f;
+            col<3> n = v1 % v2;
+            fnormals.push_back(n * (1/n.abs()));
+        }
     }
 
-    return inter_f;
-}
+    bool is_inside(size_t face_i, const vertex& v) {
+        assert(F.size() >= 3);
 
-int main()
+        col<3> center = V(F[0]).reduce();
+        col<3> v3 = v.reduce() - center;
+
+        bool ret = false;
+
+        for(size_t p1 = 1, p2 = 2; p2 < F.size() && !ret; p1++, p2++) {
+            col<3> v1 = V(F[p1]).reduce() - center,
+                   v2 = V(F[p2]).reduce() - center;
+
+            double  v1_v2 = (v1 * v2), v2_v3 = (v2 * v3), v1_v3 = (v1 * v3),
+                    v1_v1 = (v1 * v1), v2_v2 = (v2 * v2); // v3_v3 = (v3 * v3);
+
+            double a = v1_v2 * v2_v3 - v2_v2 * v1_v3;
+            double b = v1_v2 * v1_v3 - v1_v1 * v2_v3;
+            double c = v1_v2 * v1_v2 - v1_v1 * v2_v2;
+
+            a /= c; b /= c;
+
+            ret |= (a >= 0 && b >= 0 && a + b <= 1);
+        }
+
+        return ret;
+    }
+
+    // This function find the intersection point of line:(p+au) and the face F
+    // is in, and doesn't ensure the intersection in that polygon
+    double intersection(size_t face_i, const vertex& p, const col<3>& u) {
+        col<3>& n = FN;
+
+        //    (x - p0)n = 0; x = p + a u;
+        // => a = (- p n + p0 n) / (u n)
+        return ( - p.reduce() * n + V(F[0]).reduce() * n) / (u * n);
+    }
+
+    size_t emit(const vertex& p, const col<3>& u, double& min_a) {
+        min_a = 1e8;
+        size_t min_face_i = ~0UL;
+
+        for(size_t face_i = 0; face_i < faces.size(); face_i++) {
+            double a = intersection(face_i, p, u);
+
+            if(a < 0 || a > min_a) continue;
+
+            col<4> inter_p = (p.reduce() + u * a).homo();
+            if(!is_inside(face_i, inter_p)) continue;
+
+            min_a = a;
+            min_face_i = face_i;
+        }
+
+        return min_face_i;
+    }
+
+    void multiply(const matrix<4, 4>& mat) {
+        matrix<4, 4> mat_1_t = mat.inverse().t();
+
+        for(vertex& v : vertices)
+            v = mat * v.to_mat();
+        for(normal& n : normals) {
+            n = col<4>(mat_1_t * n.to_vec<4>().to_mat()).to_vec<3>();
+            n = n * (1/n.abs());
+        }
+        light = mat * light.to_mat();
+    }
+
+    color trace(const vertex& p, const col<3>& u, size_t level = 0) {
+        double ray_len;
+        size_t face_i = emit(p, u, ray_len);
+        cout << int(face_i) << p.reduce() + u * ray_len;
+        if(face_i == ~0UL) return 0xff333333;
+
+        vertex ep = (p.reduce() + u * ray_len).homo();
+        col<3> normal = VN(F[0]);
+        col<3> ray = light.reduce() - ep.reduce();
+        col<3> rayi = ray * (1 / ray.abs());
+
+        ep = (ep.reduce() + normal * 0.000001).homo();
+        col<3> ui = u * (1 / u.abs());
+
+        //////////////////////// DYE ///////////////////////////////////////////
+        // diffuse light
+        double dye_strength = normal * rayi;
+        dye_strength = min(abs(dye_strength), 1.0);
+
+        // drop shadow
+        double light_len;
+        emit(ep, ray, light_len);
+        if(light_len < 1.0)
+            dye_strength *= light_len * 3;
+
+        color dye = FC;
+        dye.r *= 0.3 + 0.7 * dye_strength;
+        dye.g *= 0.3 + 0.7 * dye_strength;
+        dye.b *= 0.3 + 0.7 * dye_strength;
+
+        //////////////////////// FURTHER TRACING ///////////////////////////////
+        if(level < 1 && (face_i == 2 || face_i == 0)) {
+            // reflection
+            col<3> r = ui - normal * (ui * normal * 2);
+            color rc = trace(ep, r, level + 1);
+            dye = dye.blend(rc, 0.3);
+        }
+
+        return dye;
+    }
+
+    void render() {
+        _gen_fnormals();
+
+        double vf = 2, vp = vf + 5;
+
+        for(size_t y = 0; y < img.height(); y++)
+        for(size_t x = 0; x < img.width(); x++) {
+            //if(x != 30 || y != 100) continue;
+
+            // triangle fan
+            col<4> screen_pt{(double(x)-img.width()/2.) / 40.,
+                    (-double(y)+img.height()/2.) / 40., vf, 1};
+            col<3> dire_vec = (screen_pt - col<4>{0, 0, vp, 1}).to_vec<3>();
+
+            cout << x << '\t' << y << ": ";
+            img(x, y) = trace(screen_pt, dire_vec);
+            cout << endl;
+        }
+    }
+};
+
+int main(int argc, char* argv[])
 {
     ofstream fout("assets/ray-tracing.ppm");
     ifstream fin("assets/cube.obj");
 
-    model m;
-    m.read(fin);
+    image img(200, 150);
+
+    renderer m(fin, img);
+    m.light = col<4>{ -1, 6, 5, 1 };
+    m.fcolors = {
+        color(0xffffcba4),
+        color(0xff9172ec),
+        color(0xff5efb6e),
+        color(0xffffffff),
+        color(0xffffffff),
+        color(0xffffffff),
+        color(0xffffffff),
+        color(0xffffffff),
+        color(0xffffffff),
+    };
 
     /*
     double avr_x = m.statistic(model::avr_x);
@@ -100,65 +200,12 @@ int main()
     using namespace transform;
 
     matrix<4, 4> mat = identity();
-    mat *= rotate(-M_PI / 12, yOz);
-    mat *= rotate(M_PI / 12, zOx);
+    mat *= rotate(-M_PI / 6, yOz);
+    mat *= rotate(M_PI / 3, zOx);
     //mat *= translate({-avr_x, -avr_y, -avr_z, 1.0});
+    m.multiply(mat);
 
-    for(model::vertex& v : m.vertices)
-        v = mat * v.to_mat();
-
-    image img(200, 150);
-    //image img(800, 600);
-
-    //double vf = 400, vp = vf + 400;
-    double vf = 2, vp = vf + 5;
-
-    for(size_t y = 0; y < img.height(); y++) {
-        for(size_t x = 0; x < img.width(); x++) {
-            // triangle fan
-            col<4> screen_pt{(double(x)-img.width()/2.) / 40.,
-                    (-double(y)+img.height()/2.) / 40., vf, 1};
-            col<3> dire_vec = (screen_pt - col<4>{0, 0, vp, 1}).to_vec<3>();
-
-            double ray_length;
-            const model::face* p_inter = find_intersection(
-                    m, dire_vec, screen_pt, ray_length);
-            cout << x << ' ' << y << ": " << p_inter << endl;
-
-            if(p_inter) {
-                col<4> inter_pt = (screen_pt.reduce() + dire_vec * ray_length).homo();
-
-                col<4> light = { -1, 5, 5, 1 };
-                //col<4> light = { 0, 10, 0, 1 };
-                light = mat * light.to_mat();
-                col<3> normal = m.normals[get<1>((*p_inter)[0])];
-                col<3> ray_vec = light.reduce() - inter_pt.reduce();
-
-                normal = normal * (1/normal.abs());
-                col<3> ray_nvec = ray_vec * (1/ray_vec.abs());
-
-                double strength = normal * ray_nvec;
-                strength = min(abs(strength), 1.0);
-                //strength = min(abs(strength), 1.0);
-
-                const model::face* p_shadow = find_intersection(m, ray_vec,
-                        (inter_pt.reduce() + normal * 0.00001).homo(), ray_length);
-                if(ray_length < 1.0 && ray_length) {
-                    cout << ray_length << endl;
-                    strength *= ray_length;
-                }
-
-                img(x, y) = color::from_arithematic(
-                        0x3f + 0xc0 * strength,
-                        0x3f + 0xc0 * strength,
-                        0x3f + 0xc0 * strength,
-                        255
-                    );
-            } else {
-                img(x, y) = 0xff333333;
-            }
-        }
-    }
+    m.render();
 
     fout << img;
 }

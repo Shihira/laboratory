@@ -319,12 +319,15 @@ inline matrix<4, 4> scale(double x, double y, double z)
 inline matrix<4, 4> identity()
     { return diagonal({1, 1, 1, 1}); }
 
-/*
-inline matrix<4, 4> perspective(double z_retina)
+inline matrix<4, 4> perspective(double fov, double wh, double zn, double zf)
 {
-
+    return matrix<4, 4>{
+        1 / tan(fov) / wh, 0, 0, 0,
+        0, 1 / tan(fov), 0, 0,
+        0, 0, (zn + zf) / (zn - zf), 2 * zn * zf / (zn - zf),
+        0, 0, -1, 0
+    };
 }
-*/
 
 }
 

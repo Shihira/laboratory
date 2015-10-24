@@ -1,3 +1,5 @@
+// cflags: -fopenmp
+
 #include <vector>
 #include <list>
 #include <algorithm>
@@ -112,55 +114,83 @@ public:
         double ray_len;
         size_t face_i = emit(p, u, ray_len);
         cout << int(face_i) << p.reduce() + u * ray_len;
-        if(face_i == ~0UL) return 0xff333333;
+        if(face_i == ~0UL) return 0xff000000;
 
         vertex ep = (p.reduce() + u * ray_len).homo();
         col<3> normal = VN(F[0]);
         col<3> ray = light.reduce() - ep.reduce();
         col<3> rayi = ray * (1 / ray.abs());
 
-        ep = (ep.reduce() + normal * 0.000001).homo();
+        vertex p_out = (ep.reduce() + normal * 0.0001).homo();
+        vertex p_in = (ep.reduce() + normal * -0.0001).homo();
         col<3> ui = u * (1 / u.abs());
 
         //////////////////////// DYE ///////////////////////////////////////////
         // diffuse light
+        color dye = FC;
         double dye_strength = normal * rayi;
         dye_strength = min(abs(dye_strength), 1.0);
 
         // drop shadow
         double light_len;
-        emit(ep, ray, light_len);
+        emit(p_out, ray, light_len);
         if(light_len < 1.0)
             dye_strength *= light_len * 3;
 
-        color dye = FC;
-        dye.r *= 0.3 + 0.7 * dye_strength;
-        dye.g *= 0.3 + 0.7 * dye_strength;
-        dye.b *= 0.3 + 0.7 * dye_strength;
+        dye.r *= dye_strength;
+        dye.g *= dye_strength;
+        dye.b *= dye_strength;
 
         //////////////////////// FURTHER TRACING ///////////////////////////////
-        if(level < 1 && (face_i == 2 || face_i == 0)) {
+        if(level < 3) {
             // reflection
             col<3> r = ui - normal * (ui * normal * 2);
-            color rc = trace(ep, r, level + 1);
-            dye = dye.blend(rc, 0.3);
+            color rc = trace(p_out, r, level + 1);
+            dye = dye.blend(rc, face_i < 3 ? 0.2 : 0.7);
+        }
+
+        double eta = 1.5;
+        if(face_i >= 3 && face_i <= 8) {
+            double cos_u = ui * normal;
+            vertex p = p_in;
+
+            if(cos_u > 0) {
+                normal = normal * -1;
+                eta = 1 / eta;
+                cos_u = -cos_u;
+                p = p_out;
+            }
+
+            col<3> t = ui - normal * cos_u;
+            t = t * (1 / eta);
+            double cos_r = 1 - t * t;
+            col<3> r = t - normal * sqrt(max(cos_r, 0.0));
+            if(cos_r > 1) {
+                r = ui - normal * (ui * normal * 2);
+                p = p_in;
+            }
+
+            color rc = trace(p, r, level + 1);
+            dye = dye.blend(rc, 0.9);
         }
 
         return dye;
     }
 
-    void render() {
+    void render(double scale) {
         _gen_fnormals();
 
-        double vf = 2, vp = vf + 5;
+        double vf = 6, vp = vf + 9;
+
+        #pragma omp parallel for
 
         for(size_t y = 0; y < img.height(); y++)
         for(size_t x = 0; x < img.width(); x++) {
-            //if(x != 30 || y != 100) continue;
+            //if(x != 87 || y != 88) continue;
 
             // triangle fan
-            col<4> screen_pt{(double(x)-img.width()/2.) / 40.,
-                    (-double(y)+img.height()/2.) / 40., vf, 1};
+            col<4> screen_pt{(double(x)-img.width()/2.) / scale,
+                    (-double(y)+img.height()/2.) / scale, vf, 1};
             col<3> dire_vec = (screen_pt - col<4>{0, 0, vp, 1}).to_vec<3>();
 
             cout << x << '\t' << y << ": ";
@@ -175,10 +205,11 @@ int main(int argc, char* argv[])
     ofstream fout("assets/ray-tracing.ppm");
     ifstream fin("assets/cube.obj");
 
+    //image img(400, 300);
     image img(200, 150);
 
     renderer m(fin, img);
-    m.light = col<4>{ -1, 6, 5, 1 };
+    m.light = col<4>{ -2, 6, 5, 1 };
     m.fcolors = {
         color(0xffffcba4),
         color(0xff9172ec),
@@ -201,11 +232,11 @@ int main(int argc, char* argv[])
 
     matrix<4, 4> mat = identity();
     mat *= rotate(-M_PI / 6, yOz);
-    mat *= rotate(M_PI / 3, zOx);
+    mat *= rotate(M_PI / 48 * atoi(argc > 1 ? argv[1] : "0"), zOx);
     //mat *= translate({-avr_x, -avr_y, -avr_z, 1.0});
     m.multiply(mat);
 
-    m.render();
+    m.render(30);
 
     fout << img;
 }

@@ -104,8 +104,13 @@ protected:
 public:
     windowgl(const std::string& title, size_t w = 800, size_t h = 600)
             : window() {
+        SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
         SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
         SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 8);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+
+        SDL_GL_SetSwapInterval(1);
 
         _window = SDL_CreateWindow(title.c_str(),
                 SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,

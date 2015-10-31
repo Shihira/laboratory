@@ -211,9 +211,9 @@ int main(int argc, char* argv[])
     renderer m(fin, img);
     m.light = col<4>{ -2, 6, 5, 1 };
     m.fcolors = {
-        color(0xffffcba4),
-        color(0xff9172ec),
-        color(0xff5efb6e),
+        color(0xffa4cbff),
+        color(0xffec7291),
+        color(0xff6efb5e),
         color(0xffffffff),
         color(0xffffffff),
         color(0xffffffff),

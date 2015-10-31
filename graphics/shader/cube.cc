@@ -14,8 +14,10 @@ const char* vs_src = R"EOF(
 
 layout(location = 0) in vec4 position;
 layout(location = 1) in vec3 normal;
+layout(location = 2) in vec2 uv;
 
-out vec4 color;
+out float diffuse;
+out vec2 uv_coord;
 
 uniform mat4 mmat;
 uniform mat4 pmat;
@@ -26,23 +28,29 @@ void main(void)
     vec3 nml = (nmmat * vec4(normal, 0)).xyz;
 
     vec4 light = vec4(2, 3, 4, 1);
-    float diffuse = clamp(
+    diffuse = clamp(
         dot(-nml, normalize((position - light).xyz)),
-        0, 1);
+        0.1, 1);
 
-    color = vec4(diffuse, diffuse, diffuse, 1);
     gl_Position = pmat * mmat * position;
+    uv_coord = uv;
 }
 )EOF";
 
 const char* fs_src = R"EOF(
 #version 330 core
 
-in vec4 color;
+in float diffuse;
+in vec2 uv_coord;
+
+out vec4 color;
+
+uniform sampler2D tex_logo;
 
 void main(void)
 {
-    gl_FragColor = color;
+    vec4 orgc = texture(tex_logo, uv_coord);
+    color = vec4(orgc.rgb * diffuse, orgc[3]);
 }
 )EOF";
 
@@ -80,6 +88,13 @@ const GLfloat normals[] = {
     0, 0, -1,
 };
 
+const GLfloat uvs[] = {
+    0, 0,
+    0, 1,
+    1, 0,
+    1, 1,
+};
+
 // 0 1 3 2
 // 4 5 7 6
 const GLuint vindices[] = {
@@ -98,6 +113,15 @@ const GLuint nindices[] = {
     3, 3, 3,    3, 3, 3,
     4, 4, 4,    4, 4, 4,
     5, 5, 5,    5, 5, 5,
+};
+
+const GLuint uindices[] = {
+    0, 1, 3,    3, 2, 0,
+    0, 1, 3,    3, 2, 0,
+    0, 1, 3,    3, 2, 0,
+    0, 1, 3,    3, 2, 0,
+    0, 1, 3,    3, 2, 0,
+    0, 1, 3,    3, 2, 0,
 };
 
 template<size_t M_, size_t N_>
@@ -195,9 +219,33 @@ int main()
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(1);
 
+    // uv
+    GLuint uv_vbo; glGenBuffers(1, &uv_vbo);
+    auto indexed_uv = extend(uvs, 2, uindices,
+        sizeof(uindices) / sizeof(GLuint));
+    glBindBuffer(GL_ARRAY_BUFFER, uv_vbo);
+    glBufferData(GL_ARRAY_BUFFER,
+        sizeof(float) * 2 * sizeof(uindices) / sizeof(GLuint),
+        indexed_uv.get(), GL_STATIC_DRAW);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(2);
+
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+    // texture
+    GLuint texture; glGenTextures(1, &texture);
+    GLuint tex_loc = glGetUniformLocation(prog, "tex_logo");
+    image img_tex("../assets/texture-logo.ppm");
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, img_tex.width(), img_tex.height(),
+            0, GL_RGBA, GL_UNSIGNED_BYTE, img_tex.buffer().data());
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    glUniform1i(tex_loc, 0);
 
     // transformation
     GLuint pmat_loc = glGetUniformLocation(prog, "pmat");

@@ -1,4 +1,4 @@
-// cflags: lnklist.c varray.c exception.c ugraph.c
+// cflags: lnklist.c varray.c vaheap.c exception.c ugraph.c
 
 #include <stdio.h>
 
@@ -49,7 +49,7 @@ int main()
     g_dfs(g, 3, print_node, NULL); putchar('\n');
 
     lnklist* path = ll_create(node*);
-    printf("%d: ", g_dijkstra(g, 0, 5, path));
+    printf("%d: ", g_dijkstra(g, 1, 5, path));
     print_ll(path);
     ll_destroy(path);
 

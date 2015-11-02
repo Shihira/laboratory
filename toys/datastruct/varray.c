@@ -69,3 +69,57 @@ void* va_at(varray* va, size_t pos)
     return va->data + pos * va->elem_size;
 }
 
+#define swap(type, a, b) \
+    { type t = a; a = b; b = t; }
+
+static void va_quick_sort_(void* array[], size_t len,
+        int (*cmp) (void* l, void* r))
+{
+    if(len <= 1) return;
+    void* pivot = array[0];
+    int i = 1, j = len - 1;
+    while(1) {
+        for(; i <= j; i++)
+            if(cmp(array[i], pivot)  > 0) break;
+        for(; i <= j; j--)
+            if(cmp(array[j], pivot) <= 0) break;
+
+        if(i > j) break;
+
+        swap(void*, array[i], array[j]);
+    }
+    swap(void*, array[0], array[j]);
+    va_quick_sort_(array, j, cmp);
+    va_quick_sort_(array + i, len - i, cmp);
+}
+
+void va_sort(varray* va, va_cmp cmp)
+{
+    void** idx = (void**) malloc(va->length * sizeof(void*));
+    if(!idx) toss(MemoryError);
+    for(size_t i = 0; i < va->length; i++)
+        idx[i] = va->data + i * va->elem_size;
+    va_quick_sort_(idx, va->length, cmp);
+
+    unsigned char* buf = (unsigned char*) malloc(va->length * va->elem_size);
+    if(!buf) toss(MemoryError);
+    for(size_t i = 0; i < va->length; i++)
+        memcpy(buf + i * va->elem_size, idx[i], va->elem_size);
+    memcpy(va->data, buf, va->length * va->elem_size);
+
+    free(buf);
+    free(idx);
+}
+
+void va_swap(varray* va, size_t posa, size_t posb)
+{
+    if(posa == posb) return; // disgusting exception
+
+    void* t = malloc(va->elem_size);
+
+    memcpy(t, va_at(va, posa), va->elem_size);
+    memcpy(va_at(va, posa), va_at(va, posb), va->elem_size);
+    memcpy(va_at(va, posb), t, va->elem_size);
+
+    free(t);
+}

@@ -4,6 +4,7 @@
 
 #include "lnklist.h"
 #include "varray.h"
+#include "vaheap.h"
 #include "exception.h"
 #include "ugraph.h"
 
@@ -101,44 +102,53 @@ void g_dfs(ugraph* g, size_t sp, void (*cb) (node*, void*), void* usr)
 typedef struct da_info_t {
     int distance;
     node* src;
+    size_t pos_heap;
 } da_info;
 
 #define to_info(n) (da_info*)va_at(da, va_indexof(g->nodes, n))
 #define to_node(i) (node*)va_at(g->nodes, va_indexof(da, i))
 
+// comparator for pointer to dijkstra info
+int pdi_cmp(void* l, void* r)
+{
+    return (*(da_info**)r)->distance - (*(da_info**)l)->distance;
+}
+
+void pdi_swp(varray* va, size_t a, size_t b)
+{
+    (*(da_info**)va_at(va, a))->pos_heap = b;
+    (*(da_info**)va_at(va, b))->pos_heap = a;
+
+    va_swap(va, a, b);
+}
+
 int g_dijkstra(ugraph* g, size_t sp, size_t ep, lnklist/*<node*>*/* path)
 {
     varray* da = va_create(da_info);
-    lnklist* h/*eap*/ = ll_create(da_info*);
+    varray* h/*eap*/ = va_create(da_info*);
 
+    // build attachment information array
     for(size_t i = 0; i < g->nodes->length; i++) {
         da_info di;
-        di.distance = INT_MAX;
+        di.distance = i == sp ? 0 : INT_MAX;
         di.src = NULL;
         va_append(da, &di);
     }
 
+    // build heap and update pos-in-heap info in `da_info`s
     for(size_t i = 0; i < g->nodes->length; i++) {
         da_info* pdi = (da_info*) va_at(da, i);
-        ll_append(h, &pdi);
+        va_heap_insert(h, pdi_cmp, &pdi);
     }
+    for(size_t i = 0; i < h->length; i++)
+        (*(da_info**)va_at(h, i))->pos_heap = i;
 
-    da_info* start = (da_info*) va_at(da, sp);
+
     da_info* target = (da_info*) va_at(da, ep);
-    start->distance = 0;
 
-    while(!ll_is_end(h->head)) {
-        // pop the min node, like what priority queue does
-        da_info* min_route = *(da_info**)(h->head->data);
-        ll_iter min_i = h->head;
-        for(ll_iter i = h->head; !ll_is_end(i); i = i->next) {
-            da_info* cur_route = *(da_info**)(i->data);
-            if(min_route->distance > cur_route->distance) {
-                min_route = cur_route;
-                min_i = i;
-            }
-        }
-        ll_remove(h, min_i);
+    while(h->length) {
+        da_info* min_route = *(da_info**)va_at(h, 0);
+        va_heap_remove_generic(h, pdi_cmp, pdi_swp, 0);
 
         if(min_route == target) break; // finally
 
@@ -150,8 +160,11 @@ int g_dijkstra(ugraph* g, size_t sp, size_t ep, lnklist/*<node*>*/* path)
 
             int this_dist = min_route->distance + e->weight;
             if(scanned->distance > this_dist) {
+                // update the heap with new distance
+                va_heap_remove_generic(h, pdi_cmp, pdi_swp, scanned->pos_heap);
                 scanned->distance = this_dist;
                 scanned->src = cur;
+                va_heap_insert_generic(h, pdi_cmp, pdi_swp, &scanned);
             }
         }
     }
@@ -168,7 +181,7 @@ int g_dijkstra(ugraph* g, size_t sp, size_t ep, lnklist/*<node*>*/* path)
         }
     }
 
-    ll_destroy(h);
+    va_destroy(h);
     va_destroy(da);
 
     return min_dist;

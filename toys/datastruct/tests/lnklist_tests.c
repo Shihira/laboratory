@@ -42,10 +42,6 @@ int main()
     } grab(RemovingTail) {
         puts("Cannot remove pass-the-end node.");
     }
-    ll_remove(lli, ll_iter_at(lli, 0));
-    print_all(lli);
-    ll_remove(lli, ll_iter_at(lli, 0));
-    print_all(lli);
 
     ll_destroy(lli);
 }

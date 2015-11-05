@@ -8,182 +8,264 @@
 #include "exception.h"
 #include "ugraph.h"
 
+// You should read these macro name in this way:
+//     cast an Iterator(or Pointer for p) to a pointer to its entity, while the
+//     iterator is originally pointing to a node(or edge* for edgep)
+#define casti_node(i) ((gnode*)((i)->data))
+#define casti_edge(i) ((gedge*)((i)->data))
+#define casti_edgep(i) (*(gedge**)((i)->data))
+
 ugraph* g_create_(size_t szelem)
 {
-    ugraph* g = (ugraph*) malloc(sizeof(ugraph));
-    g->nodes = va_create(node);
+    ugraph* g = (ugraph*)malloc(sizeof(ugraph));
+    if(!g) toss(MemoryFault);
     g->elem_size = szelem;
+    g->nodes = ll_create(gnode);
+    g->edges = ll_create(gedge);
+
     return g;
 }
 
-void g_add_node(ugraph* g, void* data)
+gnode* g_add_node(ugraph* g, void* data)
 {
-    node n;
-    n.data = (unsigned char*) malloc(sizeof(g->elem_size));
+    gnode n;
+    n.data = (uint8_t*)malloc(g->elem_size);
+    if(!n.data) toss(MemoryFault);
     memcpy(n.data, data, g->elem_size);
-    n.adj = ll_create(edge*);
+    n.adj = ll_create(gedge*);
 
-    va_append(g->nodes, &n);
+    ll_prepend(g->nodes, &n);
+    gnode* pn = casti_node(g->nodes->head);
+
+    pn->igraph = g->nodes->head;
+
+    return pn;
 }
 
-void g_connect(ugraph* g, size_t pos1, size_t pos2, int w)
+gnode* g_endpoint(gedge* e, gnode* n)
 {
-    node *n1 = (node*)va_at(g->nodes, pos1);
-    node *n2 = (node*)va_at(g->nodes, pos2);
-
-    edge* e = (edge*) malloc(sizeof(edge));
-    e->weight = w;
-    e->head = n1;
-    e->tail = n2;
-    ll_prepend(n1->adj, &e);
-    ll_prepend(n2->adj, &e);
-    e->ihead = n1->adj->head;
-    e->itail = n2->adj->head;
+    return e->head == n ? e->tail :
+        e->tail == n ? e->head : NULL;
 }
 
-void g_disconnect(ugraph* g, edge* e)
+gedge* g_connect(ugraph* g, gnode* n1, gnode* n2, int w)
+{
+    gedge e;
+    e.head = n1;
+    e.tail = n2;
+    e.weight = w;
+
+    ll_prepend(g->edges, &e);
+    gedge* pe = casti_edge(g->edges->head);
+    ll_prepend(n1->adj, &pe);
+    ll_prepend(n2->adj, &pe);
+    pe->ihead = n1->adj->head;
+    pe->itail = n2->adj->head;
+    pe->igraph = g->edges->head;
+
+    return pe;
+}
+
+void g_disconnect(ugraph* g, gedge* e)
 {
     ll_remove(e->head->adj, e->ihead);
     ll_remove(e->tail->adj, e->itail);
-    free(e);
+    ll_remove(g->edges, e->igraph);
 }
 
-void g_rm_node(ugraph* g, size_t pos)
+void g_rm_node(ugraph* g, gnode* n)
 {
-    node* n = (node*) va_at(g->nodes, pos);
-    // use n for invalid iterator handling
-    for(ll_iter i = n->adj->head, n = i->next;
-            !ll_is_end(i); i = n, n = i->next)
-        g_disconnect(g, *(edge**)(i->data));
+    for(ll_iter i = n->adj->head; !ll_is_end(i); i = i->next)
+        g_disconnect(g, casti_edgep(i));
+
     if(n->data) free(n->data);
-    ll_destroy(n->adj);
-    va_remove(g->nodes, pos);
+    ll_remove(g->nodes, n->igraph);
 }
 
 void g_destroy(ugraph* g)
 {
-    for(int i = g->nodes->length - 1; i >= 0; i--)
-        g_rm_node(g, i);
-    va_destroy(g->nodes);
+    for(ll_iter i = g->nodes->head; !ll_is_end(i); i = i->next) {
+        gnode* n = casti_node(i);
+        if(n->data) free(n->data);
+        ll_destroy(n->adj);
+    }
+
+    ll_destroy(g->nodes);
+    ll_destroy(g->edges);
     free(g);
 }
 
-void g_dfs(ugraph* g, size_t sp, void (*cb) (node*, void*), void* usr)
+void g_dfs(ugraph* g, gnode* sp, void (*cb) (gnode*, void*), void* usr)
 {
-    varray* s/*tack*/ = va_create(node*);
-    node* cur = (node*) va_at(g->nodes, sp);
-    va_append(s, &cur);
+    varray* s/*tack*/ = va_create(gnode*);
+    va_append(s, &sp);
 
-    // parallel to g->nodes
-    int* visited = (int*) calloc(g->nodes->length, sizeof(int));
+    // use reserved field as visited flag
+    for(ll_iter i = g->nodes->head; !ll_is_end(i); i = i->next)
+        casti_node(i)->rsrv = 0;
 
     while(s->length) {
-        cur = *(node**) va_at(s, s->length - 1);
+        gnode* n = *(gnode**)va_at(s, s->length - 1);
         va_remove(s, s->length - 1);
+        if(n->rsrv) continue;
 
-        if(visited[va_indexof(g->nodes, cur)]) continue;
+        cb(n, usr);
+        n->rsrv = n; // non-zero value, trivial
 
-        cb(cur, usr);
-        visited[va_indexof(g->nodes, cur)] = 1;
-
-        for(ll_iter i = cur->adj->head; !ll_is_end(i); i = i->next) {
-            node* scanned = g_endpoint((*(edge**)(i->data)), cur);
-            va_append(s, &scanned);
+        for(ll_iter i = n->adj->head; !ll_is_end(i); i = i->next) {
+            gnode* scanned_n = g_endpoint(casti_edgep(i), n);
+            // double check: reason it?
+            if(!scanned_n->rsrv)
+                va_append(s, &scanned_n);
         }
     }
 
-    free(visited);
     va_destroy(s);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Dijkstra's Algorithm
 
-typedef struct da_info_t {
+#define castp_dijkp(p) (*(dijk_info**)(p))
+#define castp_dijk(p) ((dijk_info*)(p))
+
+typedef struct dijk_info_t_ {
+    gnode* n;
+    gnode* src;
+    size_t hpos; // position in the heap, for the convenience of updating
     int distance;
-    node* src;
-    size_t pos_heap;
-} da_info;
+} dijk_info;
 
-#define to_info(n) (da_info*)va_at(da, va_indexof(g->nodes, n))
-#define to_node(i) (node*)va_at(g->nodes, va_indexof(da, i))
-
-// comparator for pointer to dijkstra info
-int pdi_cmp(void* l, void* r)
+static int dijkp_cmp_(void* l, void* r)
 {
-    return (*(da_info**)r)->distance - (*(da_info**)l)->distance;
+    // minimum heap comparator
+    return castp_dijkp(r)->distance - castp_dijkp(l)->distance;
 }
 
-void pdi_swp(varray* va, size_t a, size_t b)
+static void dijkp_swp_(varray* va, size_t a, size_t b)
 {
-    (*(da_info**)va_at(va, a))->pos_heap = b;
-    (*(da_info**)va_at(va, b))->pos_heap = a;
-
+    castp_dijkp(va_at(va, a))->hpos = b;
+    castp_dijkp(va_at(va, b))->hpos = a;
     va_swap(va, a, b);
 }
 
-int g_dijkstra(ugraph* g, size_t sp, size_t ep, lnklist/*<node*>*/* path)
+int g_dijkstra(ugraph* g, gnode* sp, gnode* ep, lnklist/*<gnode*>*/* path)
 {
-    varray* da = va_create(da_info);
-    varray* h/*eap*/ = va_create(da_info*);
+    lnklist* info_buf = ll_create(dijk_info);
+    varray* h/*eap*/ = va_create(dijk_info*);
 
-    // build attachment information array
-    for(size_t i = 0; i < g->nodes->length; i++) {
-        da_info di;
-        di.distance = i == sp ? 0 : INT_MAX;
-        di.src = NULL;
-        va_append(da, &di);
+    for(ll_iter i = g->nodes->head; !ll_is_end(i); i = i->next) {
+        gnode* n = casti_node(i);
+
+        dijk_info info;
+        info.n = n;
+        info.src = NULL;
+        info.distance = n == sp ? 0 : INT_MAX;
+        ll_prepend(info_buf, &info);
+
+        n->rsrv = ll_at(info_buf, 0);
+        va_heap_insert(h, dijkp_cmp_, &(n->rsrv));
     }
 
-    // build heap and update pos-in-heap info in `da_info`s
-    for(size_t i = 0; i < g->nodes->length; i++) {
-        da_info* pdi = (da_info*) va_at(da, i);
-        va_heap_insert(h, pdi_cmp, &pdi);
-    }
     for(size_t i = 0; i < h->length; i++)
-        (*(da_info**)va_at(h, i))->pos_heap = i;
-
-
-    da_info* target = (da_info*) va_at(da, ep);
+        castp_dijkp(va_at(h, i))->hpos = i;
 
     while(h->length) {
-        da_info* min_route = *(da_info**)va_at(h, 0);
-        va_heap_remove_generic(h, pdi_cmp, pdi_swp, 0);
+        dijk_info* info = castp_dijkp(va_at(h, 0));
+        gnode* n = info->n;
+        va_heap_remove_generic(h, dijkp_cmp_, dijkp_swp_, 0);
 
-        if(min_route == target) break; // finally
+        if(n == ep) break;
 
-        node* cur = to_node(min_route);
+        for(ll_iter i = n->adj->head; !ll_is_end(i); i = i->next) {
+            gedge* scanned_e = casti_edgep(i);
+            gnode* scanned_n = g_endpoint(scanned_e, n);
+            dijk_info* scanned_info = castp_dijk(scanned_n->rsrv);
 
-        for(ll_iter i = cur->adj->head; !ll_is_end(i); i = i->next) {
-            edge* e = *(edge**)(i->data);
-            da_info* scanned = to_info(g_endpoint(e, cur));
-
-            int this_dist = min_route->distance + e->weight;
-            if(scanned->distance > this_dist) {
-                // update the heap with new distance
-                va_heap_remove_generic(h, pdi_cmp, pdi_swp, scanned->pos_heap);
-                scanned->distance = this_dist;
-                scanned->src = cur;
-                va_heap_insert_generic(h, pdi_cmp, pdi_swp, &scanned);
+            int expect = info->distance + scanned_e->weight;
+            if(scanned_info->distance > expect) {
+                va_heap_remove_generic(h, dijkp_cmp_,
+                        dijkp_swp_, scanned_info->hpos);
+                scanned_info->distance = expect;
+                scanned_info->src = n;
+                va_heap_insert_generic(h, dijkp_cmp_,
+                        dijkp_swp_, &scanned_info);
             }
         }
     }
 
-    int min_dist = target->distance;
+    int distance = castp_dijk(ep->rsrv)->distance;
+    // retreive the path from `dijk_info`s
     if(path) {
-        da_info* cur_di = target;
-        node* n = (node*) va_at(g->nodes, ep);
-        ll_prepend(path, &n);
-        while(cur_di->src) {
-            n = cur_di->src;
-            ll_prepend(path, &n);
-            cur_di = to_info(cur_di->src);
+        gnode* src = ep;
+        while(src) {
+            ll_prepend(path, &src);
+            src = castp_dijk(src->rsrv)->src;
         }
     }
 
+    ll_destroy(info_buf);
     va_destroy(h);
-    va_destroy(da);
 
-    return min_dist;
+    return distance;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Kruskal's Algorithm
+
+#define castp_krus(p) ((krus_info*)(p))
+
+typedef struct krus_info_t {
+    gnode/*<gnode*>*/* st_n;
+    gnode* comp; // repr. the first node of the current component
+} krus_info;
+
+static int edge_cmp_(void* l, void* r)
+{
+    return (*(gedge**)l)->weight - (*(gedge**)r)->weight;
+}
+
+void g_kruskal(ugraph* g, ugraph/*<gnode*>*/* st)
+{
+    varray* edges = va_create(gedge*);
+    lnklist* info_buf = ll_create(krus_info);
+
+    for(ll_iter i = g->edges->head; !ll_is_end(i); i = i->next) {
+        gedge* e = casti_edge(i);
+        va_append(edges, &e);
+    }
+
+    for(ll_iter i = g->nodes->head; !ll_is_end(i); i = i->next) {
+        gnode* n = casti_node(i);
+        gnode* st_n = g_add_node(st, &n);
+
+        krus_info info;
+        info.st_n = st_n;
+        info.comp = st_n;
+
+        ll_prepend(info_buf, &info);
+        n->rsrv = ll_at(info_buf, 0);
+    }
+
+    // sort in increasing order
+    va_sort(edges, edge_cmp_);
+
+    for(size_t i = 0; i < edges->length; i++) {
+        gedge* e = *(gedge**)va_at(edges, i);
+        krus_info* head_info = castp_krus(e->head->rsrv);
+        krus_info* tail_info = castp_krus(e->tail->rsrv);
+        gnode* hcomp = head_info->comp;
+        gnode* tcomp = tail_info->comp;
+
+        if(hcomp != tcomp) {
+            // NOTE: optimize with mfset
+            for(ll_iter i = g->nodes->head; !ll_is_end(i); i = i->next) {
+                krus_info* cur_info = castp_krus(casti_node(i)->rsrv);
+                if(cur_info->comp == tcomp) cur_info->comp = hcomp;
+            }
+
+            g_connect(st, head_info->st_n, tail_info->st_n, e->weight);
+        }
+    }
 }
 

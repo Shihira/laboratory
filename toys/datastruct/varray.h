@@ -9,6 +9,13 @@
     #error Setting initial allocating size too low may cause error
 #endif
 
+/*
+ * NOTE: Feel free to store a pointer to a linked list element,
+ * but NEVER store a pointer to a varaible-length array element
+ * unless you have ensured that the array will no longer change!!!
+ * YOU CAN STORE THE INDEX TO SOLVE THIS PROBLEM.
+ */
+
 typedef struct varray_t {
     size_t length;
     unsigned char* data;

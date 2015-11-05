@@ -3,6 +3,16 @@
 
 #include <stddef.h>
 
+/*
+ * Tips:
+ *
+ * - Traverse a list using a loop like:
+ *
+ *     for(ll_iter i = l->head; !ll_is_end(i); i = i->next) {
+ *         // ...
+ *     }
+ */
+
 typedef struct lnklist_node_t_ {
     unsigned char* data;
     struct lnklist_node_t_* next;

@@ -13,6 +13,7 @@ lnklist* ll_create_(size_t szelem)
     ll->elem_size = szelem;
     ll->head = (lnklist_node*) malloc(sizeof(lnklist_node));
     ll->tail = ll->head;
+    ll->length = 0;
 
     // past-the-end node
     if(!ll->head) toss(MemoryError);
@@ -48,7 +49,8 @@ void ll_insert_bef(lnklist* ll, ll_iter cur, void* data)
     if(!new_data) toss(MemoryError);
     lnklist_node* new_nd = (lnklist_node*) malloc(sizeof(lnklist_node));
     if(!new_nd) toss(MemoryError);
-    memcpy(new_data, data, ll->elem_size);
+    if(data)
+        memcpy(new_data, data, ll->elem_size);
 
     new_nd->data = new_data;
 
@@ -66,6 +68,7 @@ void ll_insert_bef(lnklist* ll, ll_iter cur, void* data)
         cur->prev->next = new_nd;
         cur->prev = new_nd;
     }
+    ll->length++;
 }
 
 void ll_insert(lnklist* ll, size_t pos, void* data)
@@ -89,6 +92,7 @@ void ll_remove(lnklist* ll, ll_iter i)
 
     if(i->data) free(i->data);
     free(i);
+    ll->length--;
 }
 
 size_t ll_length(const lnklist* ll)

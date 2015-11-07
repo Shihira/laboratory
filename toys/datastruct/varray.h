@@ -37,6 +37,7 @@ void va_sort(varray* va, va_cmp cmp);
 void va_swap(varray* va, size_t posa, size_t posb);
 
 void* va_at(varray* va, size_t pos);
+int va_printf(varray* va, const char* fmt, ...);
 
 #define va_create(type) va_create_(sizeof(type))
 #define va_cast(type, va) ((type*)((va)->data))

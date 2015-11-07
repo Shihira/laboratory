@@ -1,8 +1,8 @@
-// cflags: lnklist.c varray.c vaheap.c exception.c ugraph.c
+// cflags: lnklist.c varray.c vaheap.c exception.c graph.c
 
 #include <stdio.h>
 
-#include "../ugraph.h"
+#include "../graph.h"
 
 void print_node(gnode* n, void* usr)
 {
@@ -14,6 +14,16 @@ void print_node(gnode* n, void* usr)
     for(ll_iter i = l->head; !ll_is_end(i); i = i->next) \
         print_node(*(gnode**)(i->data), NULL); \
     putchar('\n'); \
+}
+
+void quote_node_int(varray* str, gnode* n)
+{
+    va_printf(str, "\"%d\"", *(int*)n->data);
+}
+
+void quote_pnode_int(varray* str, gnode* n)
+{
+    va_printf(str, "\"%d\"", *(int*)(*(gnode**)n->data)->data);
 }
 
 int main()
@@ -28,7 +38,7 @@ int main()
      *     4`      5
      */
 
-    ugraph* g = g_create(int);
+    graph* g = g_create(int, UNDIRECTED);
     gnode* nodes[6];
     int c;
     nodes[0] = g_add_node(g, (c = 0, &c));
@@ -49,6 +59,12 @@ int main()
     g_dfs(g, nodes[0], print_node, NULL); putchar('\n');
     g_dfs(g, nodes[3], print_node, NULL); putchar('\n');
 
+    varray* dot_dump;
+
+    dot_dump = va_create(char);
+    g_dump(g, dot_dump, quote_node_int);
+    printf("Original graph:\n%s\n\n", dot_dump->data);
+    va_destroy(dot_dump);
 
     //////////////////////////////////// Dijkstra's Algo
     lnklist* path;
@@ -63,19 +79,16 @@ int main()
     print_ll(path);
     ll_destroy(path);
 
-
     //////////////////////////////////// Kruskal's Algo
-    ugraph* spantree = g_create(gnode*);
+    graph* spantree = g_create(gnode*, UNDIRECTED);
     g_kruskal(g, spantree);
 
-    for(ll_iter i = spantree->edges->head; !ll_is_end(i); i = i->next) {
-        gedge* e = (gedge*)i->data;
-        print_node(*(gnode**)e->head->data, NULL);
-        printf("- ");
-        print_node(*(gnode**)e->tail->data, NULL);
-        printf(": %d\n", e->weight);
-    }
+    dot_dump = va_create(char);
+    g_dump(spantree, dot_dump, quote_pnode_int);
+    printf("Spanning tree:\n%s", dot_dump->data);
+    va_destroy(dot_dump);
 
+    g_destroy(spantree);
     g_destroy(g);
 }
 

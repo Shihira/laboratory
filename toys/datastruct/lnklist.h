@@ -21,6 +21,7 @@ typedef struct lnklist_node_t_ {
 
 typedef struct lnklist_t_ {
     size_t elem_size;
+    size_t length; // no additional function besides counter
     lnklist_node* head;
     lnklist_node* tail;
 } lnklist;

@@ -1,5 +1,7 @@
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdarg.h>
 
 #include "exception.h"
 #include "varray.h"
@@ -42,7 +44,8 @@ void va_insert(varray* va, size_t pos, void* data)
             i >= (int)(pos * va->elem_size); i--)
         va->data[i + va->elem_size] = va->data[i];
 
-    memcpy(va->data + pos * va->elem_size, data, va->elem_size);
+    if(data)
+        memcpy(va->data + pos * va->elem_size, data, va->elem_size);
     va->length++;
 }
 
@@ -122,4 +125,32 @@ void va_swap(varray* va, size_t posa, size_t posb)
     memcpy(va_at(va, posb), t, va->elem_size);
 
     free(t);
+}
+
+int va_printf(varray* va, const char* fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+
+    size_t len = va->length;
+    int total = vsnprintf(NULL, 0, fmt, args);
+
+    if(total >= 0) {
+        for(int i = 0; i <= total / va->elem_size; i++)
+            va_append(va, NULL); // append one more block for null-terminator
+
+        va_start(args, fmt);
+        int new_total = vsnprintf((char*)(va->data + len * va->elem_size),
+            (va->capacity - len) * va->elem_size, fmt, args);
+
+        if(new_total != total) toss(UnknownError);
+
+        // There indeed is an null-terminator but we want it to be overwritten
+        // in the next printf
+        total--;
+        va->length--;
+    }
+
+    va_end(args);
+    return total;
 }

@@ -58,7 +58,7 @@ int main()
 
     va_destroy(vai);
 
-    //////////////////////////////////////////////
+    ////////////////////////////////////////////// Heap
 
     vai = va_create(int);
 
@@ -85,5 +85,16 @@ int main()
     va_heap_remove(vai, int_cmp, 0); print_all(vai);
 
     va_destroy(vai);
+
+    ////////////////////////////////////////////// Utils
+
+    varray* buf = va_create(char);
+    va_printf(buf, "Now,");
+    puts((char*)va_at(buf, 0));
+    va_printf(buf, " easier output...");
+    puts((char*)va_at(buf, 0));
+    va_printf(buf, "num:%d %f, str: %s %s", 123, 3.4, "Hello", "world");
+    puts((char*)va_at(buf, 0));
+    va_destroy(buf);
 }
 

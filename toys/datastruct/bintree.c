@@ -12,7 +12,7 @@ btnode* bt_new_node(bintree* bt, void* data)
 
     n->data = (uint8_t*) malloc(sizeof(bt->elem_size));
     if(!n->data) toss(MemoryError);
-    memcpy(n->data, data, bt->elem_size);
+    if(data) memcpy(n->data, data, bt->elem_size);
 
     n->left = NULL;
     n->right = NULL;

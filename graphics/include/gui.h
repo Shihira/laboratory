@@ -6,6 +6,7 @@
 #include <functional>
 
 #include <SDL2/SDL.h>
+#include <GL/glew.h>
 
 #include "image.h"
 
@@ -50,6 +51,18 @@ public:
             pixels[i] = img_buf[i].value();
 
         SDL_UpdateWindowSurface(_window);
+    }
+
+    int width() const {
+        int w, h;
+        SDL_GetWindowSize(_window, &w, &h);
+        return w;
+    }
+
+    int height() const {
+        int w, h;
+        SDL_GetWindowSize(_window, &w, &h);
+        return h;
     }
 };
 
@@ -102,13 +115,16 @@ protected:
     SDL_GLContext _glcontext;
 
 public:
-    windowgl(const std::string& title, size_t w = 800, size_t h = 600)
+    windowgl(const std::string& title, uint16_t glversion = 0,
+            size_t w = 800, size_t h = 600)
             : window() {
         SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
         SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
         SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 8);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+        if(glversion) {
+            SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, glversion >> 8);
+            SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, glversion & 0xff);
+        }
 
         SDL_GL_SetSwapInterval(1);
 
@@ -124,6 +140,12 @@ public:
     }
 
     void swap_buffer() { SDL_GL_SwapWindow(_window); }
+
+    void init_glew() {
+        glewExperimental = true;
+        if(glewInit() != GLEW_OK)
+            throw std::runtime_error("GLEW Initialization failed.");
+    }
 };
 
 #endif // GUI_H_INCLUDED

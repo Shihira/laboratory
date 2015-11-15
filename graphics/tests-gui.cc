@@ -1,9 +1,6 @@
 // cflags: -lSDL2 -lGL -lGLU
 
-#include <ctime>
-
 #include "include/gui.h"
-#include "include/image.h"
 #include "include/util.h"
 
 #include "GL/gl.h"
@@ -67,7 +64,6 @@ int main(int argc, char** argv)
     float light_ambient[] = { 0.2, 0.2, 0.2, 1 };
     glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
 
-    time_t last_t = time(0);
     unsigned frame_count = 0;
 
     app().register_on_paint([&]() {
@@ -85,18 +81,13 @@ int main(int argc, char** argv)
 
         glColor3d(1, 1, 1);
         glRotated(-30, 1, 0, 0);
-        glRotated(-30, 0, 1, 0);
+        glRotated(frame_count, 0, 1, 0);
         glTranslated(-avr_x, -avr_y, -avr_z);
         glCallList(dplist);
 
         w.swap_buffer();
 
         frame_count++;
-        if(time(0) - last_t > 5) {
-            cout << frame_count << endl;
-            last_t = time(0);
-            frame_count = 0;
-        }
     });
 
     app().run();

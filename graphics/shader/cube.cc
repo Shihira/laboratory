@@ -6,8 +6,10 @@
 
 #include "../include/matrix.h"
 #include "../include/gui.h"
+#include "../include/shader.h"
 
 using namespace std;
+using namespace labgl;
 
 const char* vs_src = R"EOF(
 #version 330 core
@@ -124,24 +126,16 @@ const GLuint uindices[] = {
     0, 1, 3,    3, 2, 0,
 };
 
-template<size_t M_, size_t N_>
-unique_ptr<float[]> mat2arr(const matrix<M_, N_>& m)
+template<size_t M_, size_t ind_count>
+vector<col<M_>> extend(const GLfloat *vectors,
+        const GLuint (&indices)[ind_count])
 {
-    unique_ptr<float[]> arr(new float[M_ * N_]);
-    for(size_t j = 0; j < N_; j++)
-        for(size_t i = 0; i < M_; i++)
-            arr[j * N_ + i] = m[j][i];
-    return arr;
-}
-
-unique_ptr<float[]> extend(const GLfloat* vectors, size_t vec_size,
-        const GLuint* indices, size_t ind_count)
-{
-    unique_ptr<float[]> arr(new float[ind_count * vec_size]);
-    for(size_t i = 0; i < ind_count; i++) {
-        size_t ind = indices[i];
-        for(size_t off = 0; off < vec_size; off++)
-            arr[i * vec_size + off] = vectors[ind * vec_size + off];
+    vector<col<M_>> arr(ind_count);
+    for(size_t i : indices) {
+        col<M_> vec;
+        for(size_t c = 0; c < M_; c++)
+            vec[c] = vectors[i * M_ + c];
+        arr.push_back(vec);
     }
 
     return arr;
@@ -149,125 +143,43 @@ unique_ptr<float[]> extend(const GLfloat* vectors, size_t vec_size,
 
 int main()
 {
-    windowgl w("Hello");
-
-    glewExperimental = true;
-    if(glewInit() != GLEW_OK)
-        throw std::runtime_error("GLEWInitFailed");
+    windowgl w("Hello", 0x0303);
+    w.init_glew();
 
     glClearColor(0.2, 0.2, 0.2, 1);
-    glClearDepth(0);
+    glClearDepth(1);
     glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_GEQUAL);
+    glDepthFunc(GL_LEQUAL);
 
-    ////////////////////////////////////////////////////////////////////////////
-    // Program Part
+    ////////////////////////////////////////////////////////
 
-    GLuint prog = glCreateProgram();
-    GLuint vs = glCreateShader(GL_VERTEX_SHADER);
-    GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
+    shader vs = compile(shader::vertex, vs_src);
+    shader fs = compile(shader::fragment, fs_src);
+    program prog = link(vs, fs);
 
-    char log[256]; int log_len;
+    auto ext_v = extend<4>(vertices, vindices);
+    auto ext_n = extend<3>(normals, nindices);
+    auto ext_u = extend<2>(uvs, uindices);
+    texture tex_logo(image("../assets/texture-logo.ppm"));
 
-    glShaderSource(vs, 1, &vs_src, GL_NONE);
-    glShaderSource(fs, 1, &fs_src, GL_NONE);
-    glCompileShader(vs);
-    glCompileShader(fs);
+    vertex_array vao;
+    vao.input(0, ext_v); 
+    vao.input(1, ext_n); 
+    vao.input(2, ext_u); 
 
-    glGetShaderInfoLog(vs, sizeof(log), &log_len, log);
-    log[size_t(log_len) >= sizeof(log) ? 255 : log_len] = 0;
-    cout << log << endl;
-    glGetShaderInfoLog(fs, sizeof(log), &log_len, log);
-    log[size_t(log_len) >= sizeof(log) ? 255 : log_len] = 0;
-    cout << log << endl;
-
-    glAttachShader(prog, vs);
-    glAttachShader(prog, fs);
-
-    glLinkProgram(prog);
-
-    glGetProgramInfoLog(prog, sizeof(log), &log_len, log);
-    log[size_t(log_len) >= sizeof(log) ? 255 : log_len] = 0;
-    cout << log << endl;
-
-    glUseProgram(prog);
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Buffer Part
-    GLuint vao; glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
-
-    // vertex
-    GLuint pos_vbo; glGenBuffers(1, &pos_vbo);
-    auto indexed_pos = extend(vertices, 4, vindices,
-        sizeof(vindices) / sizeof(GLuint));
-    glBindBuffer(GL_ARRAY_BUFFER, pos_vbo);
-    glBufferData(GL_ARRAY_BUFFER,
-        sizeof(float) * 4 * sizeof(vindices) / sizeof(GLuint),
-        indexed_pos.get(), GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(0);
-
-    // normal
-    GLuint nml_vbo; glGenBuffers(1, &nml_vbo);
-    auto indexed_nml = extend(normals, 3, nindices,
-        sizeof(nindices) / sizeof(GLuint));
-    glBindBuffer(GL_ARRAY_BUFFER, nml_vbo);
-    glBufferData(GL_ARRAY_BUFFER,
-        sizeof(float) * 3 * sizeof(nindices) / sizeof(GLuint),
-        indexed_nml.get(), GL_STATIC_DRAW);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(1);
-
-    // uv
-    GLuint uv_vbo; glGenBuffers(1, &uv_vbo);
-    auto indexed_uv = extend(uvs, 2, uindices,
-        sizeof(uindices) / sizeof(GLuint));
-    glBindBuffer(GL_ARRAY_BUFFER, uv_vbo);
-    glBufferData(GL_ARRAY_BUFFER,
-        sizeof(float) * 2 * sizeof(uindices) / sizeof(GLuint),
-        indexed_uv.get(), GL_STATIC_DRAW);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(2);
-
-    glBindVertexArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-    // texture
-    GLuint texture; glGenTextures(1, &texture);
-    GLuint tex_loc = glGetUniformLocation(prog, "tex_logo");
-    image img_tex("../assets/texture-logo.ppm");
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, img_tex.width(), img_tex.height(),
-            0, GL_RGBA, GL_UNSIGNED_BYTE, img_tex.buffer().data());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glGenerateMipmap(GL_TEXTURE_2D);
-    glUniform1i(tex_loc, 0);
-
-    // transformation
-    GLuint pmat_loc = glGetUniformLocation(prog, "pmat");
-    GLuint mmat_loc = glGetUniformLocation(prog, "mmat");
-    matrix<4, 4> pmat = transform::perspective(M_PI / 4, 4. / 3, -1, 1);
+    matrix<4, 4> pmat = transform::perspective(M_PI / 4, 4. / 3, 3, 6);
     matrix<4, 4> mmat = transform::identity();
     mmat *= transform::translate(col<4>{ 0, 0, -5, 1 });
     mmat *= transform::rotate(-M_PI / 6, transform::yOz);
 
+    prog.uniform("tex_logo", tex_logo);
+
     app().register_on_paint([&]() {
         mmat *= rotate(M_PI / 360, transform::zOx);
-        auto mmat_arr = mat2arr(mmat);
-        auto pmat_arr = mat2arr(pmat);
-        glUniformMatrix4fv(mmat_loc, 1, false, mmat_arr.get());
-        glUniformMatrix4fv(pmat_loc, 1, false, pmat_arr.get());
 
-        glClear(GL_COLOR_BUFFER_BIT);
-        glClear(GL_DEPTH_BUFFER_BIT);
-        glBindVertexArray(vao);
-        //glDrawElements(GL_TRIANGLES, sizeof(vindices) / sizeof(GLuint),
-        //        GL_UNSIGNED_INT, NULL);
-        glDrawArrays(GL_TRIANGLES, 0, sizeof(vindices) / sizeof(GLuint));
+        prog.uniform("mmat", mmat);
+        prog.uniform("pmat", pmat);
+        prog.render(frame_buffer::screen, vao);
 
         w.swap_buffer();
     });

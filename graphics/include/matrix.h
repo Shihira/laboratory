@@ -39,6 +39,8 @@ public:
 
         auto begin() -> decltype(data_.begin()) { return data_.begin(); }
         auto end() -> decltype(data_.end()) { return data_.end(); }
+        auto begin() const -> decltype(data_.begin()) { return data_.begin(); }
+        auto end() const -> decltype(data_.end()) { return data_.end(); }
 
         matrix<M_, 1> to_mat() const { return matrix<M_, 1>(*this); }
         double abs() const {
@@ -177,6 +179,8 @@ public:
 
         auto begin() -> decltype(cols_.begin()) { return cols_.begin(); }
         auto end() -> decltype(cols_.end()) { return cols_.end(); }
+        auto begin() const -> decltype(cols_.begin()) { return cols_.begin(); }
+        auto end() const -> decltype(cols_.end()) { return cols_.end(); }
 
         double cofactor(size_t m, size_t n) const {
                 matrix<M_-1, N_-1> new_mat;
@@ -321,10 +325,12 @@ inline matrix<4, 4> identity()
 
 inline matrix<4, 4> perspective(double fov, double wh, double zn, double zf)
 {
+    double f = 1 / tan(fov);
+    double c = zn - zf;
     return matrix<4, 4>{
-        1 / tan(fov) / wh, 0, 0, 0,
-        0, 1 / tan(fov), 0, 0,
-        0, 0, (zn + zf) / (zn - zf), 2 * zn * zf / (zn - zf),
+        f / wh, 0, 0, 0,
+        0, f, 0, 0,
+        0, 0, (zn + zf) / c, 2 * zn * zf / c,
         0, 0, -1, 0
     };
 }

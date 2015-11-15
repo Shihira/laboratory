@@ -266,6 +266,34 @@ public:
 
         return ret;
     }
+
+    void extract_triangles(std::vector<vertex>& vs,
+            std::vector<normal>& ns, std::vector<texture>& ts) {
+        for(face& f : faces) {
+            size_t fe_i[] = { 0, 1, 2 };
+            for(; fe_i[2] < f.size(); fe_i[1]++, fe_i[2]++) {
+                for(size_t j = 0; j < 3; j++) {
+                    size_t v_i, n_i, t_i;
+                    std::tie(v_i, n_i, t_i) = f[fe_i[j]];
+
+                    if(v_i < vertices.size()) {
+                        vertex& v = vertices[v_i];
+                        vs.push_back(v);
+                    }
+
+                    if(n_i < normals.size()) {
+                        normal& n = normals[n_i];
+                        ns.push_back(n);
+                    }
+
+                    if(t_i < textures.size()) {
+                        texture& t = textures[t_i];
+                        ts.push_back(t);
+                    }
+                }
+            }
+        }
+    }
 };
 
 #define EST(code, repeat) \

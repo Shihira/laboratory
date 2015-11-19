@@ -10,7 +10,7 @@ btnode* bt_new_node(bintree* bt, void* data)
     btnode* n = (btnode*) malloc(sizeof(btnode));
     if(!n) toss(MemoryError);
 
-    n->data = (uint8_t*) malloc(sizeof(bt->elem_size));
+    n->data = (uint8_t*) malloc(bt->elem_size);
     if(!n->data) toss(MemoryError);
     if(data) memcpy(n->data, data, bt->elem_size);
 
@@ -21,18 +21,12 @@ btnode* bt_new_node(bintree* bt, void* data)
     return n;
 }
 
-void bt_rm_node(btnode* n)
+void bt_rm_node(bintree* bt, btnode* n)
 {
     if(n->left) n->left->parent = NULL;
     if(n->right) n->right->parent = NULL;
-    if(n->parent) {
-        if(n->parent->left == n)
-            n->parent->left = NULL;
-        else if(n->parent->right == n)
-            n->parent->right = NULL;
-        else
-            toss(Unreasonable);
-    }
+    if(n->parent) bt_pfield(bt, n->parent, n) = NULL;
+    if(bt->root == n) bt->root = NULL;
 
     if(n->data) free(n->data);
     free(n);
@@ -43,28 +37,23 @@ bintree* bt_create_(size_t szelem, void* data)
     bintree* bt = (bintree*) malloc(sizeof(bintree));
     if(!bt) toss(MemoryError);
     bt->elem_size = szelem;
-    bt->root = bt_new_node(bt, data);
+    if(data) bt->root = bt_new_node(bt, data);
+    else bt->root = NULL;
     return bt;
 }
 
 btnode* bt_lchild(btnode* rt, btnode* n)
 {
-    if(!n) return rt->left;
-    else {
-        rt->left = n;
-        n->parent = rt;
-        return n;
-    }
+    rt->left = n;
+    if(n) n->parent = rt;
+    return n;
 }
 
 btnode* bt_rchild(btnode* rt, btnode* n)
 {
-    if(!n) return rt->right;
-    else {
-        rt->right = n;
-        n->parent = rt;
-        return n;
-    }
+    rt->right = n;
+    if(n) n->parent = rt;
+    return n;
 }
 
 void bt_traverse(btnode* n, traverse_order to,
@@ -88,10 +77,10 @@ void bt_traverse(btnode* n, traverse_order to,
 }
 
 void bt_erase_node_(btnode* n, void* usr)
-{ bt_rm_node(n); }
+{ bt_rm_node((bintree*)usr, n); }
 void bt_destroy(bintree* bt)
 {
-    bt_traverse(bt->root, lrp, bt_erase_node_, NULL);
+    bt_traverse(bt->root, lrp, bt_erase_node_, bt);
     // we have reason to believe that the root node has got freed
     free(bt);
 }

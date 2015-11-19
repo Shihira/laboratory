@@ -14,6 +14,7 @@ typedef struct btnode_t_ {
 typedef struct bintree_t_ {
     size_t elem_size;
     btnode* root;
+    void* reserved;
 } bintree;
 
 typedef enum child_order_e_ {
@@ -30,8 +31,12 @@ typedef enum traverse_order_e {
     rlp = 1, // 1
 } traverse_order;
 
+// node->data is not be initialize if data is null
+// NEVER inserting non-root node without bt_l/rchild
 btnode* bt_new_node(bintree* bt, void* data);
-void bt_rm_node(btnode* n);
+void bt_rm_node(bintree* bt, btnode* n);
+// bt_create allows you to initialize the root element
+// tree->root is set NULL if data is null
 bintree* bt_create_(size_t szelem, void* data);
 btnode* bt_lchild(btnode* rt, btnode* n);
 btnode* bt_rchild(btnode* rt, btnode* n);
@@ -41,6 +46,9 @@ void bt_erase_node_(btnode* n, void* usr);
 void bt_destroy(bintree* bt);
 
 #define bt_create(type, data) bt_create_(sizeof(type), data)
+#define bt_pfield(bt, p, n) *(!p ? &(bt->root) : \
+    (p->left) == (n) ? (&(p->left)) : \
+    (p->right)==(n) ? (&(p->right)) : NULL)
 
 #endif // BINTREE_H_INCLUDED
 

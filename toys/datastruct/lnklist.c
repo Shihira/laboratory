@@ -74,6 +74,37 @@ void ll_insert_bef(lnklist* ll, ll_iter cur, void* data)
 void ll_insert(lnklist* ll, size_t pos, void* data)
 { ll_insert_bef(ll, ll_iter_at(ll, pos), data); }
 
+size_t ll_move_bef(lnklist* dst, lnklist* src,
+        ll_iter idst, ll_iter isrc, size_t count)
+{
+    if(ll_is_end(isrc)) return 0;
+
+    ll_iter isrc_lst = isrc;
+
+    int moved_count = 1;
+    for(; moved_count < count; moved_count++, isrc_lst = isrc_lst->next)
+        if(ll_is_end(isrc_lst->next)) break;
+
+    //// 3 cuts in total d>--ΣF>--ΣD  s>--ΣS
+    //// where dD:Destination F:Fragment sS:Source
+    // S>--ΣS
+    if(isrc->prev) isrc->prev->next = isrc_lst->next;
+    else src->head = isrc_lst->next;
+    isrc_lst->next->prev = isrc->prev;
+    // D>--ΣF
+    if(idst->prev) idst->prev->next = isrc;
+    else dst->head = isrc;
+    isrc->prev = idst->prev;
+    // ΣF>--ΣD
+    isrc_lst->next = idst;
+    idst->prev = isrc_lst;
+
+    dst->length += moved_count;
+    src->length -= moved_count;
+
+    return moved_count;
+}
+
 void ll_prepend(lnklist* ll, void* data)
     { ll_insert(ll, 0, data); }
 void ll_append(lnklist* ll, void* data)

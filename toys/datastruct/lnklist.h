@@ -35,6 +35,8 @@ void ll_insert_bef(lnklist* ll, ll_iter iter, void* data);
 void ll_prepend(lnklist* ll, void* data);
 void ll_append(lnklist* ll, void* data);
 void ll_remove(lnklist* ll, ll_iter i);
+size_t ll_move_bef(lnklist* dst, lnklist* src,
+        ll_iter idst, ll_iter isrc, size_t count);
 
 ll_iter ll_iter_at(lnklist* ll, size_t pos);
 void* ll_at(lnklist* ll, size_t pos);

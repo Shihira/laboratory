@@ -1,3 +1,7 @@
+/*
+ * Copyright(c) 2015, Shihira Fung <fengzhiping@hotmail.com>
+ */
+
 #include <stdlib.h>
 
 #include "b_tree.h"
@@ -11,6 +15,7 @@ b_node* b_new_node_(lnklist* new_entries)
     b_node* n = (b_node*)malloc(sizeof(b_node));
     n->entries = new_entries;
     n->parentn = NULL;
+    n->right = NULL;
 
     return n;
 }
@@ -29,6 +34,58 @@ b_tree* b_create_(size_t degree, size_t szkey, size_t szval, b_cmp cmp)
     b_t->degree = degree;
 
     return b_t;
+}
+
+void b_traverse(b_node* n, b_traverse_order to,
+    void (*cb) (b_entry*, void*), void* usr)
+{
+    if(!n) return;
+    if(to == lpr) {
+        for(ll_iter i = n->entries->head;
+                !ll_is_end(i); i = i->next) {
+            b_entry* e = (b_entry*)(i->data);
+            b_traverse(e->left, to, cb, usr);
+            cb(e, usr);
+        }
+        b_traverse(n->right, to, cb, usr);
+    } else if(to == plr) {
+        for(ll_iter i = n->entries->head;
+                !ll_is_end(i); i = i->next)
+            cb((b_entry*)i->data, usr);
+        for(ll_iter i = n->entries->head;
+                !ll_is_end(i); i = i->next)
+            b_traverse(((b_entry*)i->data)->left, to, cb, usr);
+        b_traverse(n->right, to, cb, usr);
+    } else if(to == lrp) {
+        for(ll_iter i = n->entries->head;
+                !ll_is_end(i); i = i->next)
+            b_traverse(((b_entry*)i->data)->left, to, cb, usr);
+        b_traverse(n->right, to, cb, usr);
+        for(ll_iter i = n->entries->head;
+                !ll_is_end(i); i = i->next)
+            cb((b_entry*)i->data, usr);
+    }
+}
+
+void b_rm_node_recur_(b_node* n)
+{
+    if(!n) return;
+    for(ll_iter i = n->entries->head; !ll_is_end(i); i = i->next) {
+        b_entry* e = (b_entry*)(i->data);
+        b_rm_node_recur_(e->left);
+        if(e->key) free(e->key); e->key = NULL;
+        if(e->val) free(e->val); e->val = NULL;
+    }
+    b_rm_node_recur_(n->right);
+
+    ll_destroy(n->entries);
+    free(n);
+}
+
+void b_destroy(b_tree* b_t)
+{
+    b_rm_node_recur_(b_t->root);
+    free(b_t);
 }
 
 /*

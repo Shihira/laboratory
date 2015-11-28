@@ -1,8 +1,9 @@
-// cflags: lnklist.c varray.c vaheap.c exception.c graph.c
+// cflags: lnklist.c varray.c vaheap.c exception.c graph.c utils.c
 
 #include <stdio.h>
 
 #include "../graph.h"
+#include "../utils.h"
 
 void print_node(gnode* n, void* usr)
 {
@@ -40,13 +41,13 @@ int main()
 
     graph* g = g_create(int, UNDIRECTED);
     gnode* nodes[6];
-    int c;
-    nodes[0] = g_add_node(g, (c = 0, &c));
-    nodes[1] = g_add_node(g, (c = 1, &c));
-    nodes[2] = g_add_node(g, (c = 2, &c));
-    nodes[3] = g_add_node(g, (c = 3, &c));
-    nodes[4] = g_add_node(g, (c = 4, &c));
-    nodes[5] = g_add_node(g, (c = 5, &c));
+
+    nodes[0] = g_add_node(g, refi(0));
+    nodes[1] = g_add_node(g, refi(1));
+    nodes[2] = g_add_node(g, refi(2));
+    nodes[3] = g_add_node(g, refi(3));
+    nodes[4] = g_add_node(g, refi(4));
+    nodes[5] = g_add_node(g, refi(5));
 
     g_connect(g, nodes[0], nodes[1], 12);
     g_connect(g, nodes[0], nodes[2], 10);

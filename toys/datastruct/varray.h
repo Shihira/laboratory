@@ -1,3 +1,7 @@
+/*
+ * Copyright(c) 2015, Shihira Fung <fengzhiping@hotmail.com>
+ */
+
 #ifndef VARRAY_H_INCLUDED
 #define VARRAY_H_INCLUDED
 

@@ -1,3 +1,7 @@
+/*
+ * Copyright(c) 2015, Shihira Fung <fengzhiping@hotmail.com>
+ */
+
 #ifndef UGRAPH_H_INCLUDED
 #define UGRAPH_H_INCLUDED
 

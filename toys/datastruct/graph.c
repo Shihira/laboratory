@@ -1,3 +1,7 @@
+/*
+ * Copyright(c) 2015, Shihira Fung <fengzhiping@hotmail.com>
+ */
+
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>

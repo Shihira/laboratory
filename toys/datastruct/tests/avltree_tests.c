@@ -1,4 +1,4 @@
-// cflags: bintree.c avltree.c exception.c
+// cflags: bintree.c avltree.c exception.c utils.c
 
 #include "../avltree.h"
 
@@ -13,14 +13,10 @@ void print_str_int(btnode* n, void* usr)
 }
 
 #define print_tree(t) bt_traverse(t->root, lpr, print_str_int, 0); puts("");
-#define DEFREF(name, type) type* name(type v) { static type sv; sv = v; return &sv; }
-
-DEFREF(refs, char const *)
-DEFREF(refi, int)
 
 int main()
 {
-    bintree* map = avl_create(char*, int, string_cmp);
+    bintree* map = avl_create(char*, int, cmps);
 
     avl_set(map, refs("Shihira"),    refi(19));
     avl_set(map, refs("AVLTree"),    refi(80));

@@ -1,11 +1,16 @@
+/*
+ * Copyright(c) 2015, Shihira Fung <fengzhiping@hotmail.com>
+ */
+
 #ifndef AVLTREE_H_INCLUDED
 #define AVLTREE_H_INCLUDED
 
 #include "bintree.h"
+#include "utils.h"
 
 #include <string.h>
 
-typedef int (*avl_cmp) (const void*, const void*);
+typedef comparator avl_cmp;
 
 typedef struct avl_entry_t_ {
     uint8_t* key;
@@ -27,9 +32,6 @@ void* avl_get(bintree* bt, void const * key, btnode** node);
 void avl_unset_node(bintree* bt, btnode* n);
 void avl_unset(bintree* bt, void const * key);
 void avl_destroy(bintree* bt);
-
-int int32_cmp(const void* l, const void* r);
-int string_cmp(const void* l, const void* r);
 
 #define entryof(n) ((avl_entry*)n->data)
 #define avl_create(ktype, vtype, kcmp) \

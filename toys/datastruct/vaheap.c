@@ -1,3 +1,7 @@
+/*
+ * Copyright(c) 2015, Shihira Fung <fengzhiping@hotmail.com>
+ */
+
 #include "vaheap.h"
 
 void va_heap_insert_generic(varray* va, va_cmp cmp,

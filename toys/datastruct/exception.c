@@ -1,3 +1,7 @@
+/*
+ * Copyright(c) 2015, Shihira Fung <fengzhiping@hotmail.com>
+ */
+
 #include "exception.h"
 
 jmp_buf jmp_context_stack_[64];

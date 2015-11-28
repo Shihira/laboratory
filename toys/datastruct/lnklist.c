@@ -1,3 +1,7 @@
+/*
+ * Copyright(c) 2015, Shihira Fung <fengzhiping@hotmail.com>
+ */
+
 #include "lnklist.h"
 
 #include <stdlib.h>
@@ -35,7 +39,6 @@ void ll_destroy(lnklist* ll)
     lnklist_node* cur = ll->head;
     while(cur) {
         lnklist_node* nxt = cur->next;
-        if(cur->data) free(cur->data);
         free(cur);
         cur = nxt;
     }
@@ -45,14 +48,11 @@ void ll_destroy(lnklist* ll)
 
 void ll_insert_bef(lnklist* ll, ll_iter cur, void* data)
 {
-    unsigned char* new_data = (unsigned char*) malloc(ll->elem_size);
-    if(!new_data) toss(MemoryError);
-    lnklist_node* new_nd = (lnklist_node*) malloc(sizeof(lnklist_node));
+    lnklist_node* new_nd = (lnklist_node*)
+        malloc(sizeof(lnklist_node) + ll->elem_size);
     if(!new_nd) toss(MemoryError);
-    if(data)
-        memcpy(new_data, data, ll->elem_size);
-
-    new_nd->data = new_data;
+    new_nd->data = (unsigned char*)(new_nd + 1);
+    if(data) memcpy(new_nd->data, data, ll->elem_size);
 
     if(cur == ll->head) {
         new_nd->next = ll->head;
@@ -121,7 +121,6 @@ void ll_remove(lnklist* ll, ll_iter i)
         i->next->prev = i->prev;
     }
 
-    if(i->data) free(i->data);
     free(i);
     ll->length--;
 }

@@ -1,3 +1,7 @@
+/*
+ * Copyright(c) 2015, Shihira Fung <fengzhiping@hotmail.com>
+ */
+
 #ifndef LNKLIST_H_INCLUDED
 #define LNKLIST_H_INCLUDED
 

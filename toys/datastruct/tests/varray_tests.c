@@ -1,10 +1,11 @@
-// cflags: exception.c varray.c vaheap.c
+// cflags: exception.c varray.c vaheap.c utils.c
 
 #include <stdio.h>
 
 #include "../varray.h"
 #include "../exception.h"
 #include "../vaheap.h"
+#include "../utils.h"
 
 #define print_all(a) { \
     for(size_t i = 0; i < (a)->length; ++i) \
@@ -21,18 +22,17 @@ int main()
 {
     varray* vai = va_create(int);
 
-    int i;
-    va_prepend(vai, (i = 4, &i));
+    va_prepend(vai, refi(4));
     print_all(vai);
-    va_append(vai, (i = 5, &i));
+    va_append(vai, refi(5));
     print_all(vai);
-    va_prepend(vai, (i = 6, &i));
+    va_prepend(vai, refi(6));
     print_all(vai);
-    va_insert(vai, 2, (i = 8, &i));
+    va_insert(vai, 2, refi(8));
     print_all(vai);
-    va_prepend(vai, (i = 7, &i));
+    va_prepend(vai, refi(7));
     print_all(vai);
-    va_append(vai, (i = 3, &i));
+    va_append(vai, refi(3));
     print_all(vai);
 
     va_sort(vai, int_cmp);
@@ -62,16 +62,16 @@ int main()
 
     vai = va_create(int);
 
-    va_heap_insert(vai, int_cmp, (i = 11, &i)); print_all(vai);
-    va_heap_insert(vai, int_cmp, (i = 26, &i)); print_all(vai);
-    va_heap_insert(vai, int_cmp, (i = 6 , &i)); print_all(vai);
-    va_heap_insert(vai, int_cmp, (i = 23, &i)); print_all(vai);
-    va_heap_insert(vai, int_cmp, (i = 17, &i)); print_all(vai);
-    va_heap_insert(vai, int_cmp, (i = 30, &i)); print_all(vai);
-    va_heap_insert(vai, int_cmp, (i = 9 , &i)); print_all(vai);
-    va_heap_insert(vai, int_cmp, (i = 15, &i)); print_all(vai);
-    va_heap_insert(vai, int_cmp, (i = 13, &i)); print_all(vai);
-    va_heap_insert(vai, int_cmp, (i = 24, &i)); print_all(vai);
+    va_heap_insert(vai, int_cmp, refi(11)); print_all(vai);
+    va_heap_insert(vai, int_cmp, refi(26)); print_all(vai);
+    va_heap_insert(vai, int_cmp, refi(6 )); print_all(vai);
+    va_heap_insert(vai, int_cmp, refi(23)); print_all(vai);
+    va_heap_insert(vai, int_cmp, refi(17)); print_all(vai);
+    va_heap_insert(vai, int_cmp, refi(30)); print_all(vai);
+    va_heap_insert(vai, int_cmp, refi(9 )); print_all(vai);
+    va_heap_insert(vai, int_cmp, refi(15)); print_all(vai);
+    va_heap_insert(vai, int_cmp, refi(13)); print_all(vai);
+    va_heap_insert(vai, int_cmp, refi(24)); print_all(vai);
 
     va_heap_remove(vai, int_cmp, 0); print_all(vai);
     va_heap_remove(vai, int_cmp, 0); print_all(vai);

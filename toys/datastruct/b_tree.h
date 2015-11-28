@@ -1,11 +1,16 @@
+/*
+ * Copyright(c) 2015, Shihira Fung <fengzhiping@hotmail.com>
+ */
+
 #ifndef B_TREE_H_INCLUDED
 #define B_TREE_H_INCLUDED
 
 #include <stdint.h>
 
 #include "lnklist.h"
+#include "utils.h"
 
-typedef int (*b_cmp) (const void*, const void*);
+typedef comparator b_cmp;
 
 typedef struct b_node_t {
     struct b_node_t* parentn;
@@ -27,8 +32,14 @@ typedef struct b_tree_t_ {
     size_t degree;
 } b_tree;
 
+typedef enum b_traverse_order_e {
+    lpr, plr, lrp,
+} b_traverse_order;
+
 b_tree* b_create_(size_t degree, size_t szkey, size_t szval, b_cmp cmp);
 void b_destroy(b_tree* b_t);
+void b_traverse(b_node* n, b_traverse_order to,
+    void (*cb) (b_entry*, void*), void* usr);
 
 void* b_get(b_tree* b_t, void* key);
 void b_set(b_tree* b_t, void* key, void* val);

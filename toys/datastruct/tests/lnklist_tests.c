@@ -1,8 +1,9 @@
-// cflags: exception.c lnklist.c
+// cflags: exception.c lnklist.c utils.c
 
 #include <stdio.h>
 
 #include "../lnklist.h"
+#include "../utils.h"
 #include "../exception.h"
 
 #define print_all(l) { \
@@ -15,18 +16,17 @@ int main()
 {
     lnklist* lli = ll_create(int);
 
-    int i;
-    ll_prepend(lli, (i = 4, &i));
+    ll_prepend(lli, refi(4));
     print_all(lli);
-    ll_append(lli, (i = 5, &i));
+    ll_append(lli, refi(5));
     print_all(lli);
-    ll_prepend(lli, (i = 6, &i));
+    ll_prepend(lli, refi(6));
     print_all(lli);
-    ll_insert(lli, 2, (i = 8, &i));
+    ll_insert(lli, 2, refi(8));
     print_all(lli);
-    ll_prepend(lli, (i = 7, &i));
+    ll_prepend(lli, refi(7));
     print_all(lli);
-    ll_append(lli, (i = 3, &i));
+    ll_append(lli, refi(3));
     print_all(lli);
 
     ll_remove(lli, ll_iter_at(lli, 3));
@@ -45,11 +45,11 @@ int main()
 
     lnklist* lli_temp = ll_create(int);
 
-    ll_prepend(lli_temp, (i = 15, &i));
-    ll_prepend(lli_temp, (i = 14, &i));
-    ll_prepend(lli_temp, (i = 13, &i));
-    ll_prepend(lli_temp, (i = 12, &i));
-    ll_prepend(lli_temp, (i = 11, &i));
+    ll_prepend(lli_temp, refi(15));
+    ll_prepend(lli_temp, refi(14));
+    ll_prepend(lli_temp, refi(13));
+    ll_prepend(lli_temp, refi(12));
+    ll_prepend(lli_temp, refi(11));
     printf("%lu: ", lli_temp->length); print_all(lli_temp);
 
     ll_move_bef(lli, lli_temp, lli->head, lli_temp->head, 3);

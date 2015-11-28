@@ -1,3 +1,7 @@
+/*
+ * Copyright(c) 2015, Shihira Fung <fengzhiping@hotmail.com>
+ */
+
 #include "bintree.h"
 
 #include <stdlib.h>
@@ -7,11 +11,10 @@
 
 btnode* bt_new_node(bintree* bt, void* data)
 {
-    btnode* n = (btnode*) malloc(sizeof(btnode));
+    btnode* n = (btnode*) malloc(sizeof(btnode) + bt->elem_size);
     if(!n) toss(MemoryError);
 
-    n->data = (uint8_t*) malloc(bt->elem_size);
-    if(!n->data) toss(MemoryError);
+    n->data = (uint8_t*)(n + 1);
     if(data) memcpy(n->data, data, bt->elem_size);
 
     n->left = NULL;
@@ -28,7 +31,6 @@ void bt_rm_node(bintree* bt, btnode* n)
     if(n->parent) bt_pfield(bt, n->parent, n) = NULL;
     if(bt->root == n) bt->root = NULL;
 
-    if(n->data) free(n->data);
     free(n);
 }
 

@@ -1,3 +1,7 @@
+/*
+ * Copyright(c) 2015, Shihira Fung <fengzhiping@hotmail.com>
+ */
+
 #ifndef VAHEAP_H_INCLUDED
 #define VAHEAP_H_INCLUDED
 

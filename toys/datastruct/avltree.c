@@ -1,3 +1,7 @@
+/*
+ * Copyright(c) 2015, Shihira Fung <fengzhiping@hotmail.com>
+ */
+
 #include <stdlib.h>
 
 #include "avltree.h"
@@ -6,23 +10,9 @@
 #define metaof(avl) ((avl_meta*)avl->reserved)
 #define heightof(n) ((n)?entryof((n))->height:0)
 
-int int32_cmp(const void* l, const void* r)
-{
-    int32_t il = *(const int32_t*)l;
-    int32_t ir = *(const int32_t*)r;
-    return il - ir;
-}
-
-int string_cmp(const void* l, const void* r)
-{
-    char const * sl = *(char const * const *) l;
-    char const * sr = *(char const * const *) r;
-    return strcmp(sl, sr);
-}
-
 bintree* avl_create_(size_t szkey, size_t szval, avl_cmp cmp)
 {
-    bintree* avl = bt_create(avl_entry, NULL);
+    bintree* avl = bt_create_(sizeof(avl_entry) + szkey + szval, NULL);
 
     avl->reserved = malloc(sizeof(avl_meta));
     if(!avl->reserved) toss(MemoryError);
@@ -36,14 +26,14 @@ bintree* avl_create_(size_t szkey, size_t szval, avl_cmp cmp)
 static btnode* avl_new_node_(bintree* bt,
         void const * key, void const * val)
 {
-    static avl_entry empty_entry = { NULL, NULL, 1 };
+    avl_entry empty_entry = { NULL, NULL, 1 };
 
     avl_meta* meta = metaof(bt);
-    btnode* new_node = bt_new_node(bt, &empty_entry);
+    btnode* new_node = bt_new_node(bt, NULL);
+    empty_entry.key = new_node->data + sizeof(avl_entry);
+    empty_entry.val = new_node->data + sizeof(avl_entry) + metaof(bt)->key_size;
 
-    entryof(new_node)->key = (uint8_t*)malloc(meta->key_size);
-    entryof(new_node)->val = (uint8_t*)malloc(meta->val_size);
-
+    memcpy(new_node->data, &empty_entry, sizeof(empty_entry));
     memcpy(entryof(new_node)->key, key, meta->key_size);
     memcpy(entryof(new_node)->val, val, meta->val_size);
 
@@ -190,6 +180,33 @@ void avl_unset(bintree* bt, void const * key)
     if(n) avl_unset_node(bt, n);
 }
 
+#define avl_swap_node_p_(p1, p2) { btnode* t = p1; p1 = p2; p2 = t; }
+#define avl_swap_node_correct_self_(n1, n2) { \
+    if(n1->left == n1) { n1->left = n2; n2->parent = n1; } \
+    if(n1->right == n1) { n1->right = n2; n2->parent = n1; } \
+}
+
+static void avl_swap_node(bintree* bt, btnode* n1, btnode* n2)
+{
+    if(n1 == n2) return;
+
+    avl_swap_node_p_(n1->parent, n2->parent);
+    avl_swap_node_p_(n1->left, n2->left);
+    avl_swap_node_p_(n1->right, n2->right);
+
+    avl_swap_node_correct_self_(n1, n2);
+    avl_swap_node_correct_self_(n2, n1);
+
+    if(n1->parent != n2) bt_pfield(bt, n1->parent, n2) = n1;
+    if(n2->parent != n1) bt_pfield(bt, n2->parent, n1) = n2;
+
+    if(n1->left)  n1->left->parent  = n1;
+    if(n1->right) n1->right->parent = n1;
+
+    if(n2->left)  n2->left->parent  = n2;
+    if(n2->right) n2->right->parent = n2;
+}
+
 void avl_unset_node(bintree* bt, btnode* n)
 {
     btnode* cur_node;
@@ -203,11 +220,6 @@ void avl_unset_node(bintree* bt, btnode* n)
         while(cur_node->left)
             cur_node = cur_node->left;
     } else {
-        if(entryof(n)->key)
-            free(entryof(n)->key);
-        if(entryof(n)->val)
-            free(entryof(n)->val);
-
         btnode* p = n->parent;
         bt_rm_node(bt, n);
 
@@ -223,23 +235,14 @@ void avl_unset_node(bintree* bt, btnode* n)
         entryof(n)->height = entryof(cur_node)->height;
         entryof(cur_node)->height = h;
 
-        uint8_t* buf = n->data;
-        n->data = cur_node->data;
-        cur_node->data = buf;
+        avl_swap_node(bt, cur_node, n);
     }
 
-    avl_unset_node(bt, cur_node);
-}
-
-static void free_entry_content_(btnode* n, void* usr)
-{
-    if(entryof(n)->key) free(entryof(n)->key);
-    if(entryof(n)->val) free(entryof(n)->val);
+    avl_unset_node(bt, n);
 }
 
 void avl_destroy(bintree* bt)
 {
-    bt_traverse(bt->root, lpr, free_entry_content_, 0);
     if(bt->reserved) free(bt->reserved);
     bt_destroy(bt);
 }

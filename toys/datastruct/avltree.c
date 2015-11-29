@@ -178,6 +178,7 @@ void avl_unset(bintree* bt, void const * key)
     btnode* n;
     avl_get(bt, key, &n);
     if(n) avl_unset_node(bt, n);
+    else toss(KeyNotFound);
 }
 
 #define avl_swap_node_p_(p1, p2) { btnode* t = p1; p1 = p2; p2 = t; }

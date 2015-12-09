@@ -65,8 +65,8 @@ template<typename T>
 struct uniform_helper_ { };
 
 #define declare_umat_func_(glfunc) \
-    static void ufunc (GLint loc, GLsizei c, GLboolean t, const GLfloat* v) \
-    { glfunc(loc, c, t, v); }
+    static void ufunc (GLint loc, GLsizei c, const GLfloat* v) \
+    { glfunc(loc, c, false, v); }
 #define declare_uvec_func_(glfunc) \
     static void ufunc (GLint loc, GLsizei c, const GLfloat* v) \
     { glfunc(loc, c, v); }
@@ -75,6 +75,50 @@ template<> struct uniform_helper_<matrix<4, 4>>
     { declare_umat_func_(glUniformMatrix4fv); };
 template<> struct uniform_helper_<col<4>>
     { declare_uvec_func_(glUniform4fv); };
+template<> struct uniform_helper_<col<1>>
+    { declare_uvec_func_(glUniform1fv); };
+
+/**********************************************************/
+
+/*************** Algebraic types conversion ***************/
+
+template<typename T> struct algebraic_cvt_ { };
+
+template<size_t M_> struct algebraic_cvt_<col<M_>> {
+    typedef col<M_> elem_type;
+    typedef col<M_> value_type;
+    constexpr static size_t count(const value_type&) { return 1; }
+    constexpr static size_t size(const value_type&) { return M_; }
+    static std::vector<float> convert(const value_type& c) {
+        return std::vector<float>(c.begin(), c.end());
+    }
+};
+
+template<size_t M_, size_t N_> struct algebraic_cvt_<matrix<M_, N_>> {
+    typedef matrix<M_, N_> elem_type;
+    typedef matrix<M_, N_> value_type;
+    constexpr static size_t count(const value_type&) { return 1; }
+    constexpr static size_t size(const value_type&) { return M_ * N_; }
+    static std::vector<float> convert(const value_type& m) {
+        std::vector<float> v;
+        for(auto c : m) for(auto e : c)
+            v.push_back(e);
+        return v;
+    }
+};
+
+template<size_t M_> struct algebraic_cvt_<std::vector<col<M_>>> {
+    typedef col<M_> elem_type;
+    typedef std::vector<col<M_>> value_type;
+    static size_t count(const value_type& v) { return v.size(); }
+    constexpr static size_t size(const value_type&) { return M_; }
+    static std::vector<float> convert(const value_type& vc) {
+        std::vector<float> v;
+        for(auto c : vc) for(auto e : c)
+            v.push_back(e);
+        return v;
+    }
+};
 
 /**********************************************************/
 
@@ -93,8 +137,9 @@ protected:
 
 public:
     texture(GLuint texid) : texture_id_(texid) { }
-    texture(const texture& tex) :
-        texture_id_(tex.texture_id_) { }
+    texture(const texture& tex) = delete;
+    texture(texture&& tex) : texture_id_(tex.texture_id_)
+        { tex.texture_id_ = 0; }
 
     texture(const image& img) {
         comp_ = rgba_8888;
@@ -123,8 +168,9 @@ public:
         glBindTexture(GL_TEXTURE_2D, 0);
     }
 
-    texture& operator=(texture& tex) {
-        texture_id_ = tex.texture_id_; return *this; }
+    texture& operator=(const texture& tex) = delete;
+    texture& operator=(texture&& tex) {
+        texture_id_ = tex.texture_id_; tex.texture_id_ = 0; return *this; }
     GLuint id() const { return texture_id_; }
 
     size_t width() const {
@@ -144,6 +190,10 @@ public:
     }
 
     component type() const { return comp_; }
+
+    ~texture() {
+        if(texture_id_) glDeleteTextures(0, &texture_id_);
+    }
 };
 
 const GLenum texture::tex_param_[2][3] = {
@@ -151,16 +201,41 @@ const GLenum texture::tex_param_[2][3] = {
     { GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT, },
 };
 
+class buffer {
+protected:
+    GLuint buffer_id_;
+
+public:
+    buffer() { glGenBuffers(1, &buffer_id_); }
+    buffer(GLuint bid) : buffer_id_(bid) { }
+    buffer(const buffer& b) = delete;
+    buffer(buffer&& b) : buffer_id_(b.buffer_id_) { b.buffer_id_ = 0; }
+    buffer& operator=(const buffer& b) = delete;
+    buffer& operator=(buffer&& b) {
+        buffer_id_ = b.buffer_id_;
+        b.buffer_id_ = 0;
+        return *this;
+    }
+    ~buffer() { if(buffer_id_) glDeleteBuffers(1, &buffer_id_); }
+    GLuint id() const { return buffer_id_; }
+};
+
 class frame_buffer {
+protected:
     GLuint frame_buffer_id_;
 
 public:
     frame_buffer() { glGenFramebuffers(1, &frame_buffer_id_); }
     frame_buffer(GLuint fbid) : frame_buffer_id_(fbid) { }
-    frame_buffer(const frame_buffer& fb)
-        : frame_buffer_id_(fb.frame_buffer_id_) { }
-    frame_buffer& operator=(frame_buffer& fb) {
-        frame_buffer_id_ = fb.frame_buffer_id_; return *this; }
+    frame_buffer(const frame_buffer& fb) = delete;
+    frame_buffer(frame_buffer&& fb) : frame_buffer_id_(fb.frame_buffer_id_)
+        { fb.frame_buffer_id_ = 0; }
+    frame_buffer& operator=(frame_buffer&& fb) {
+        frame_buffer_id_ = fb.frame_buffer_id_;
+        fb.frame_buffer_id_ = 0;
+        return *this;
+    }
+    frame_buffer& operator=(const frame_buffer& fb) = delete;
     GLuint id() const { return frame_buffer_id_; }
 
     const static frame_buffer screen;
@@ -184,6 +259,11 @@ public:
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
+
+    ~frame_buffer() {
+        if(frame_buffer_id_)
+            glDeleteFramebuffers(1, &frame_buffer_id_);
+    }
 };
 
 const frame_buffer frame_buffer::screen = frame_buffer(0);
@@ -199,10 +279,15 @@ protected:
 public:
     vertex_array() { glGenVertexArrays(1, &vertex_array_id_); }
     vertex_array(GLuint vaid) : vertex_array_id_(vaid) { }
-    vertex_array(const vertex_array& va) :
-        vertex_array_id_(va.vertex_array_id_) { }
-    vertex_array& operator=(vertex_array& va) {
-        vertex_array_id_ = va.vertex_array_id_; return *this; }
+    vertex_array(const vertex_array& va) = delete;
+    vertex_array(vertex_array&& va) : vertex_array_id_(va.vertex_array_id_)
+        { va.vertex_array_id_ = 0; }
+    vertex_array& operator=(const vertex_array& va) = delete;
+    vertex_array& operator=(vertex_array&& va) {
+        vertex_array_id_ = va.vertex_array_id_;
+        va.vertex_array_id_ = 0;
+        return *this;
+    }
     GLuint id() const { return vertex_array_id_; }
 
     void input(GLuint loc, size_t group, const std::vector<float> v) {
@@ -223,13 +308,13 @@ public:
             throw std::runtime_error("Element count not match.");
     }
 
-    template<size_t M_>
-    void input(GLuint loc, const std::vector<col<M_>>& v) {
-        std::vector<float> buf;
-        for(const col<M_>& c : v)
-            for(auto elem : c)
-                buf.push_back(elem);
-        input(loc, M_, buf);
+    template<typename T>
+    void input(GLuint loc, const T& v) {
+        input(loc, algebraic_cvt_<T>::size(v), algebraic_cvt_<T>::convert(v));
+    }
+
+    ~vertex_array() {
+        if(vertex_array_id_) glDeleteVertexArrays(1, &vertex_array_id_);
     }
 };
 
@@ -247,29 +332,14 @@ public:
 
     std::vector<std::pair<std::string, texture const *>> texture_bindings;
 
-    template<size_t M_, size_t N_>
-    void uniform(const std::string& name, const matrix<M_, N_>& m) {
+    template<typename T>
+    void uniform(const std::string& name, const T& v) {
         GLuint loc = glGetUniformLocation(program_id_, name.c_str());
-
-        std::vector<float> buf;
-        for(size_t j = 0; j < N_; j++)
-            for(size_t i = 0; i < M_; i++)
-                buf.push_back(m(i, j));
+        auto stdvec = algebraic_cvt_<T>::convert(v);
 
         glUseProgram(program_id_);
-        uniform_helper_<matrix<M_, N_>>::ufunc(loc, 1, false, buf.data());
-        glUseProgram(0);
-    }
-
-    template<size_t M_>
-    void uniform(const std::string& name, const col<M_>& v) {
-        GLuint loc = glGetUniformLocation(program_id_, name.c_str());
-
-        std::vector<float> buf;
-        for(auto elem : v) buf.push_back(elem);
-
-        glUseProgram(program_id_);
-        uniform_helper_<col<M_>>::ufunc(loc, 1, buf.data());
+        uniform_helper_<T>::ufunc(loc,
+            algebraic_cvt_<T>::count(v), stdvec.data());
         glUseProgram(0);
     }
 

@@ -13,7 +13,7 @@
 class window {
 protected:
     SDL_Window* _window;
-    SDL_Renderer* _renderer;
+    //SDL_Renderer* _renderer;
 
     window() {
         static bool sdl_has_init = false;
@@ -34,11 +34,11 @@ public:
                 w, h, SDL_WINDOW_SHOWN);
         if(!_window) throw std::runtime_error("Failed to create window.");
 
-        _renderer = SDL_CreateRenderer(_window, -1, SDL_RENDERER_ACCELERATED);
+        //_renderer = nullptr; SDL_CreateRenderer(_window, -1, SDL_RENDERER_SOFTWARE);
     }
 
     ~window() {
-        if(_renderer) SDL_DestroyRenderer(_renderer);
+        //if(_renderer) SDL_DestroyRenderer(_renderer);
         if(_window) SDL_DestroyWindow(_window);
     }
 

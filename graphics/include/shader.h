@@ -11,6 +11,8 @@
 #include <GL/glew.h>
 #include <string>
 #include <memory>
+#include <map>
+#include <tuple>
 
 #include "matrix.h"
 #include "image.h"
@@ -64,59 +66,141 @@ inline shader compile(shader::shader_type_e type, const std::string& src)
 template<typename T>
 struct uniform_helper_ { };
 
-#define declare_umat_func_(glfunc) \
-    static void ufunc (GLint loc, GLsizei c, const GLfloat* v) \
+#define declare_umat_func_(glfunc, t) \
+    static void ufunc (GLint loc, GLsizei c, const t* v) \
     { glfunc(loc, c, false, v); }
-#define declare_uvec_func_(glfunc) \
-    static void ufunc (GLint loc, GLsizei c, const GLfloat* v) \
+#define declare_uvec_func_(glfunc, t) \
+    static void ufunc (GLint loc, GLsizei c, const t* v) \
     { glfunc(loc, c, v); }
 
 template<> struct uniform_helper_<matrix<4, 4>>
-    { declare_umat_func_(glUniformMatrix4fv); };
+    { declare_umat_func_(glUniformMatrix4fv, GLfloat); };
 template<> struct uniform_helper_<col<4>>
-    { declare_uvec_func_(glUniform4fv); };
+    { declare_uvec_func_(glUniform4fv, GLfloat); };
 template<> struct uniform_helper_<col<1>>
-    { declare_uvec_func_(glUniform1fv); };
+    { declare_uvec_func_(glUniform1fv, GLfloat); };
+template<> struct uniform_helper_<float>
+    { declare_uvec_func_(glUniform1fv, GLfloat); };
+template<typename T> struct uniform_helper_<std::vector<T>>
+    : public uniform_helper_<T> { };
 
 /**********************************************************/
 
 /*************** Algebraic types conversion ***************/
 
+// algebraic_cvt_ helper class reference:
+//  - elem_type: type of the algebraic type
+//  - value_type: input type [ <elem_type> <elem_type> ... ]
+//  - raw_type: encodeed type for OpenGL, vector usually
+//  - count: count of the elem_type
+//  - size: count of raw_type::value_type of each elem_type
+//  - encode: encode input type to raw type
+
 template<typename T> struct algebraic_cvt_ { };
 
 template<size_t M_> struct algebraic_cvt_<col<M_>> {
+    enum { gl_elem_type = GL_FLOAT };
     typedef col<M_> elem_type;
     typedef col<M_> value_type;
+    typedef std::vector<float> raw_type;
     constexpr static size_t count(const value_type&) { return 1; }
-    constexpr static size_t size(const value_type&) { return M_; }
-    static std::vector<float> convert(const value_type& c) {
-        return std::vector<float>(c.begin(), c.end());
+    constexpr static size_t size() { return M_; }
+    static raw_type encode(const value_type& c) {
+        return raw_type(c.begin(), c.end());
     }
 };
 
 template<size_t M_, size_t N_> struct algebraic_cvt_<matrix<M_, N_>> {
+    enum { gl_elem_type = GL_FLOAT };
     typedef matrix<M_, N_> elem_type;
     typedef matrix<M_, N_> value_type;
+    typedef std::vector<float> raw_type;
     constexpr static size_t count(const value_type&) { return 1; }
-    constexpr static size_t size(const value_type&) { return M_ * N_; }
-    static std::vector<float> convert(const value_type& m) {
-        std::vector<float> v;
+    constexpr static size_t size() { return M_ * N_; }
+    static raw_type encode(const value_type& m) {
+        raw_type v;
         for(auto c : m) for(auto e : c)
             v.push_back(e);
         return v;
     }
 };
 
-template<size_t M_> struct algebraic_cvt_<std::vector<col<M_>>> {
-    typedef col<M_> elem_type;
-    typedef std::vector<col<M_>> value_type;
-    static size_t count(const value_type& v) { return v.size(); }
-    constexpr static size_t size(const value_type&) { return M_; }
-    static std::vector<float> convert(const value_type& vc) {
-        std::vector<float> v;
-        for(auto c : vc) for(auto e : c)
-            v.push_back(e);
+template<> struct algebraic_cvt_<GLfloat> {
+    enum { gl_elem_type = GL_FLOAT };
+    typedef GLfloat elem_type;
+    typedef GLfloat value_type;
+    typedef std::vector<GLfloat> raw_type;
+    constexpr static size_t count(const value_type&) { return 1; }
+    constexpr static size_t size() { return 1; }
+    static raw_type encode(const value_type& f) { return raw_type(1, f); }
+};
+
+template<> struct algebraic_cvt_<GLint> {
+    enum { gl_elem_type = GL_FLOAT }; // HELP: I tried change it to GL_INT but it was just not working
+    typedef GLint elem_type;
+    typedef GLint value_type;
+    typedef std::vector<GLint> raw_type;
+    constexpr static size_t count(const value_type&) { return 1; }
+    constexpr static size_t size() { return 1; }
+    static raw_type encode(const value_type& i) { return raw_type(1, i); }
+};
+
+// tuple encoding: wow. such code. so much ellipsis
+template<typename Head> size_t tuple_size_()
+    { return algebraic_cvt_<Head>::size(); }
+
+template<typename Head, typename ... Tail>
+typename std::enable_if<(sizeof...(Tail) > 0), size_t>::type tuple_size_()
+    { return algebraic_cvt_<Head>::size() + tuple_size_<Tail ...>(); }
+
+template<size_t I, typename ... TupleArgs>
+typename std::enable_if<I == sizeof...(TupleArgs), void>::type
+tuple_encode_(std::vector<float>& v, const std::tuple<TupleArgs ...>& t) { }
+
+template<size_t I, typename ... TupleArgs>
+typename std::enable_if<I < sizeof...(TupleArgs), void>::type
+tuple_encode_(std::vector<float>& v, const std::tuple<TupleArgs ...>& t) {
+    std::vector<float> tmp = algebraic_cvt_<typename std::tuple_element<
+        I, std::tuple<TupleArgs ...>>::type>::encode(std::get<I>(t));
+    v.insert(v.end(), tmp.begin(), tmp.end());
+    tuple_encode_<I + 1>(v, t);
+}
+
+// NOTE: accept floating point types onlly
+template<typename ... Args>
+struct algebraic_cvt_<std::tuple<Args ...>> {
+    enum { gl_elem_type = GL_FLOAT };
+    typedef std::tuple<Args ...> elem_type;
+    typedef std::tuple<Args ...> value_type;
+    typedef std::vector<float> raw_type;
+    static size_t count(const value_type&) { return 1; }
+    static size_t size() { return tuple_size_<Args ...>(); }
+    static raw_type encode(const value_type& t) {
+        raw_type v;
+        tuple_encode_<0>(v, t);
         return v;
+    }
+};
+
+template<typename T>
+struct algebraic_cvt_<std::vector<T>> {
+    enum { gl_elem_type = algebraic_cvt_<T>::gl_elem_type };
+    typedef T elem_type;
+    typedef std::vector<T> value_type;
+    typedef typename algebraic_cvt_<T>::raw_type raw_type;
+    static size_t count(const value_type& v) {
+        size_t c = 0;
+        for(const T& e : v) c += algebraic_cvt_<T>::count(e);
+        return c;
+    }
+    static size_t size() { return algebraic_cvt_<T>::size(); }
+    static raw_type encode(const value_type& v) {
+        raw_type raw_v;
+        for(const T& e : v) {
+            raw_type raw_e = algebraic_cvt_<T>::encode(e);
+            raw_v.insert(raw_v.end(), raw_e.begin(), raw_e.end());
+        }
+        return raw_v;
     }
 };
 
@@ -218,7 +302,19 @@ public:
     }
     ~buffer() { if(buffer_id_) glDeleteBuffers(1, &buffer_id_); }
     GLuint id() const { return buffer_id_; }
+
+    template<typename T>
+    void assign(const T& v) {
+        glBindBuffer(GL_ARRAY_BUFFER, buffer_id_);
+        auto raw_v = algebraic_cvt_<T>::encode(v);
+        glBufferData(GL_ARRAY_BUFFER,
+            raw_v.size() * sizeof(typename decltype(raw_v)::value_type),
+            raw_v.data(), GL_STATIC_DRAW);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+    }
 };
+
+typedef std::unique_ptr<buffer> buffer_ptr;
 
 class frame_buffer {
 protected:
@@ -276,6 +372,8 @@ protected:
 
     size_t vertex_count_ = 0;
 
+    std::map<GLuint, buffer_ptr> inputs_;
+
 public:
     vertex_array() { glGenVertexArrays(1, &vertex_array_id_); }
     vertex_array(GLuint vaid) : vertex_array_id_(vaid) { }
@@ -290,27 +388,22 @@ public:
     }
     GLuint id() const { return vertex_array_id_; }
 
-    void input(GLuint loc, size_t group, const std::vector<float> v) {
-        glBindVertexArray(vertex_array_id_);
-        
-        GLuint vbo; glGenBuffers(1, &vbo);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER, v.size() * sizeof(float),
-                v.data(), GL_STATIC_DRAW);
-        glVertexAttribPointer(loc, group, GL_FLOAT, GL_FALSE, 0, 0);
-        glEnableVertexAttribArray(loc);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-        glBindVertexArray(0);
-
-        if(!vertex_count_) vertex_count_ = v.size() / group;
-        if(vertex_count_ != v.size() / group)
-            throw std::runtime_error("Element count not match.");
-    }
-
     template<typename T>
     void input(GLuint loc, const T& v) {
-        input(loc, algebraic_cvt_<T>::size(v), algebraic_cvt_<T>::convert(v));
+        buffer_ptr& p = inputs_[loc];
+        if(!p) p = buffer_ptr(new buffer());
+        p->assign(v);
+
+        glBindVertexArray(vertex_array_id_);
+        glBindBuffer(GL_ARRAY_BUFFER, p->id());
+        glVertexAttribPointer(loc, algebraic_cvt_<T>::size(),
+                algebraic_cvt_<T>::gl_elem_type, GL_FALSE, 0, 0);
+        glEnableVertexAttribArray(loc);
+        glBindVertexArray(0);
+
+        if(!vertex_count_) vertex_count_ = algebraic_cvt_<T>::count(v);
+        else if(vertex_count_ != algebraic_cvt_<T>::count(v))
+            throw std::runtime_error("Element count not match.");
     }
 
     ~vertex_array() {
@@ -323,6 +416,9 @@ class program {
 protected:
     GLuint program_id_;
 
+    std::map<std::string, buffer_ptr> uniform_blocks_;
+    std::vector<std::pair<std::string, texture const *>> texture_bindings_;
+
 public:
     program(GLuint pgid) : program_id_(pgid) { }
     program(const program& pg) : program_id_(pg.program_id_) { }
@@ -330,12 +426,28 @@ public:
         program_id_ = pg.program_id_; return *this; }
     GLuint id() const { return program_id_; }
 
-    std::vector<std::pair<std::string, texture const *>> texture_bindings;
+    template<typename T>
+    void uniform_block(const std::string& name, const T& v) {
+        GLuint loc = glGetUniformBlockIndex(program_id_, name.c_str());
+        if(loc == GL_INVALID_INDEX)
+            throw std::runtime_error("No such uniform block");
+
+        buffer_ptr& p = uniform_blocks_[name];
+        if(!p) p = buffer_ptr(new buffer());
+        p->assign(v);
+
+        glUseProgram(program_id_);
+        glBindBuffer(GL_UNIFORM_BUFFER, p->id());
+        glUniformBlockBinding(program_id_, loc, loc); // key
+        glBindBufferBase(GL_UNIFORM_BUFFER, loc, p->id());
+        glUseProgram(0);
+    };
 
     template<typename T>
     void uniform(const std::string& name, const T& v) {
-        GLuint loc = glGetUniformLocation(program_id_, name.c_str());
-        auto stdvec = algebraic_cvt_<T>::convert(v);
+        GLint loc = glGetUniformLocation(program_id_, name.c_str());
+        if(loc < 0) throw std::runtime_error("No such uniform");
+        auto stdvec = algebraic_cvt_<T>::encode(v);
 
         glUseProgram(program_id_);
         uniform_helper_<T>::ufunc(loc,
@@ -345,7 +457,7 @@ public:
 
     void uniform(const std::string& name, const texture& tex) {
         // store the binding pair. decide mount point on rendering
-        texture_bindings.push_back(make_pair(name, &tex));
+        texture_bindings_.push_back(make_pair(name, &tex));
     }
 
     void render(const frame_buffer& fb, const vertex_array& vao,
@@ -360,11 +472,12 @@ public:
 
         glUseProgram(program_id_);
 
-        for(size_t i = 0; i < texture_bindings.size(); i++) {
+        for(size_t i = 0; i < texture_bindings_.size(); i++) {
             glActiveTexture(GL_TEXTURE0 + i);
-            glBindTexture(GL_TEXTURE_2D, texture_bindings[i].second->id());
-            GLuint loc = glGetUniformLocation(program_id_,
-                    texture_bindings[i].first.c_str());
+            glBindTexture(GL_TEXTURE_2D, texture_bindings_[i].second->id());
+            GLint loc = glGetUniformLocation(program_id_,
+                    texture_bindings_[i].first.c_str());
+            if(loc < 0) throw std::runtime_error("No such uniform");
             glUniform1i(loc, i);
         }
 

@@ -119,24 +119,14 @@ void main()
 }
 )EOF";
 
-vector<float> tt_pos = {
-    -1,  1, 0, 1,
-    -1, -1, 0, 1,
-     1, -1, 0, 1,
-     1, -1, 0, 1,
-     1,  1, 0, 1,
-    -1,  1, 0, 1,
+vector<col<4>> tt_pos = {
+    col<4>{ -1,  1, 0, 1 },
+    col<4>{ -1, -1, 0, 1 },
+    col<4>{  1, -1, 0, 1 },
+    col<4>{  1, -1, 0, 1 },
+    col<4>{  1,  1, 0, 1 },
+    col<4>{ -1,  1, 0, 1 },
 };
-
-template<size_t M_, size_t N_>
-unique_ptr<float[]> mat2arr(const matrix<M_, N_>& m)
-{
-    unique_ptr<float[]> arr(new float[M_ * N_]);
-    for(size_t j = 0; j < N_; j++)
-        for(size_t i = 0; i < M_; i++)
-            arr[j * N_ + i] = m[j][i];
-    return arr;
-}
 
 int main()
 {
@@ -181,7 +171,7 @@ int main()
     vao.input(1, normals);
 
     vertex_array vao_test;
-    vao_test.input(0, 4, tt_pos);
+    vao_test.input(0, tt_pos);
 
     ////////////////////////////////////////////////////////////////////////////
     // Transform and render

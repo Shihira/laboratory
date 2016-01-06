@@ -5,15 +5,23 @@ uniform light {
 };
 
 in vertexInterpBlock {
+    vec4 posView;
     vec4 position;
     vec3 normal;
 } vertexInterp;
 
+out vec4 fragColor;
+
 void main()
 {
-    vec3 ray = normalize((posLight / posLight.w - vertexInterp.position).xyz);
-    float diffuseStrength = dot(ray, vertexInterp.normal);
+    vec3 ray = normalize((vertexInterp.position - posLight / posLight.w).xyz);
+    vec3 view = -normalize(vertexInterp.posView.xyz);
+    vec3 refl = reflect(ray, normalize(vertexInterp.normal));
 
-    gl_FragColor = vec4(diffuseStrength, diffuseStrength, diffuseStrength, 1);
+    float diffuseStrength = dot(-ray, normalize(vertexInterp.normal));
+    float specularStrength = pow(max(dot(view, refl)*1.2, 0.0), 32.0);
+    float strength = clamp(diffuseStrength + specularStrength, 0.2, 1);
+
+    fragColor = vec4(strength * 0.8, strength * 1.1, strength * 1.2, 1);
 }
 

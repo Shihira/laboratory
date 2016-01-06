@@ -153,6 +153,7 @@ public:
 
         image() : _ver(6) { }
         image(size_t w, size_t h) : _ver(6) { assign(w, h); }
+        image(size_t w, size_t h, color c) : _ver(6) { assign(w, h, c); }
         image(const std::string& fn) {
                 std::ifstream fin(fn);
                 load(fin);
@@ -167,6 +168,11 @@ public:
                 _w = w;
                 _h = h;
                 _buf.resize(_w * _h);
+        }
+        void assign(size_t w, size_t h, color c) {
+                _w = w;
+                _h = h;
+                _buf.assign(_w * _h, c);
         }
 
         color& operator[](const point& p) { return pixel(p); }

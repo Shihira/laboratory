@@ -26,6 +26,8 @@ MainWindow::MainWindow()
             this, SLOT(sendWheelMotion(const QVariant&)));
     connect(wheelMotion, SIGNAL(finished()),
             this, SLOT(finishedMotion()));
+
+    cursorPulse->start(15);
 }
 
 char* MainWindow::getPassword(rfbClient* cl)
@@ -38,11 +40,16 @@ char* MainWindow::getPassword(rfbClient* cl)
 
 void MainWindow::triggeredGoConnect()
 {
+    if(!form.actionConnect->isChecked()) {
+        if(cl) rfbClientCleanup(cl);
+        cl = nullptr;
+        return;
+    }
+
     static const char* serverHost = "127.0.0.1";
     char* dyn_serverHost = (char*)malloc(sizeof(serverHost));
     strcpy(dyn_serverHost, serverHost);
 
-    if(cl) rfbClientCleanup(cl);
     cl = rfbGetClient(8, 3, 4);
 
     cl->serverHost = dyn_serverHost;
@@ -54,10 +61,7 @@ void MainWindow::triggeredGoConnect()
         return;
     }
 
-    SendPointerEvent(cl, 0, 0, ~0UL & rfbButton2Mask);
-    SendPointerEvent(cl, 0, 0, 0UL);
-
-    cursorPulse->start(15);
+    sendCursorClick(QPoint(0, 0));
 }
 
 void MainWindow::triggeredGoSwitch_Keyboard()
@@ -78,6 +82,13 @@ MainWindow::~MainWindow()
 
 QPoint MainWindow::getVeencyCursor()
 {
+    if(!form.actionToggle_VS_Entry->isChecked()) {
+        QPoint orgPos = QCursor::pos();
+        if(orgPos.x() > 1365 && orgPos.y() < 700)
+            orgPos.setX(1365);
+        QCursor::setPos(orgPos);
+    }
+
     QPoint p = QCursor::pos();
     QRect rt = form.centralwidget->geometry();
 
@@ -97,12 +108,13 @@ QPoint MainWindow::getVeencyCursor()
 
 void MainWindow::sendCursorPos(QPoint p, unsigned mask)
 {
-    if(!cl) return;
-
     if(p.x() < 0 && mask == ~0U) {
         p = getVeencyCursor();
         mask = buttonState;
     }
+
+    if(!cl) return;
+
     SendPointerEvent(cl, p.x(), p.y(), buttonState);
 }
 
@@ -147,6 +159,8 @@ void MainWindow::mousePressEvent(QMouseEvent* event)
 void MainWindow::mouseReleaseEvent(QMouseEvent* event)
 {
     QPoint p = getVeencyCursor();
+
+    form.actionToggle_VS_Entry->setChecked(true);
 
     if(event->button() & Qt::LeftButton)
         buttonState &= ~rfbButton1Mask;

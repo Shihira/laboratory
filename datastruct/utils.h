@@ -19,5 +19,6 @@ int cmpi64(void const * a, void const * b);
 char const ** refs(char const * s);
 int32_t * refi(int32_t i);
 int64_t * refi64(int64_t i);
+void* * refp(void* i);
 
 #endif // UTILS_H_INCLUDED

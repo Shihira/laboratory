@@ -88,8 +88,18 @@ int main()
     g_dump(spantree, dot_dump, quote_pnode_int);
     printf("Spanning tree:\n%s", dot_dump->data);
     va_destroy(dot_dump);
-
     g_destroy(spantree);
+
+    //////////////////////////////////// Prim's Algo
+    spantree = g_create(gnode*, UNDIRECTED);
+    g_prim(g, spantree);
+
+    dot_dump = va_create(char);
+    g_dump(spantree, dot_dump, quote_pnode_int);
+    printf("Spanning tree:\n%s", dot_dump->data);
+    va_destroy(dot_dump);
+    g_destroy(spantree);
+
     g_destroy(g);
 }
 

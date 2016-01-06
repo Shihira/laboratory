@@ -61,6 +61,18 @@ inline shader compile(shader::shader_type_e type, const std::string& src)
     return shader(sdid);
 }
 
+inline shader compile(shader::shader_type_e type, std::istream& src)
+{
+    return compile(type, std::string(std::istreambuf_iterator<char>(src),
+                std::istreambuf_iterator<char>()));
+}
+
+inline shader compile(shader::shader_type_e type, std::istream&& src)
+{
+    return compile(type, src);
+}
+
+
 /******** Uniform overloading functions induction *********/
 
 template<typename T>
@@ -81,6 +93,8 @@ template<> struct uniform_helper_<col<1>>
     { declare_uvec_func_(glUniform1fv, GLfloat); };
 template<> struct uniform_helper_<float>
     { declare_uvec_func_(glUniform1fv, GLfloat); };
+template<> struct uniform_helper_<GLint>
+    { declare_uvec_func_(glUniform1iv, GLint); };
 template<typename T> struct uniform_helper_<std::vector<T>>
     : public uniform_helper_<T> { };
 
@@ -226,9 +240,14 @@ public:
         { tex.texture_id_ = 0; }
 
     texture(const image& img) {
+        glGenTextures(1, &texture_id_);
+
+        bitblt(img);
+    }
+
+    void bitblt(const image& img) {
         comp_ = rgba_8888;
 
-        glGenTextures(1, &texture_id_);
         glBindTexture(GL_TEXTURE_2D, texture_id_);
         glTexImage2D(GL_TEXTURE_2D, 0, tex_param_[comp_][0],
                 img.width(), img.height(), 0, tex_param_[comp_][1],
@@ -338,8 +357,10 @@ public:
 
     enum buf_type {
         none = 0,
-        depth_buffer = 1,
-        color_buffer = 2,
+        color_buffer_0 = 1,
+        color_buffer_1 = 2,
+        color_buffer_2 = 4,
+        depth_buffer = 1U << 31,
         all = 0xffffffff,
     };
 
@@ -351,6 +372,12 @@ public:
                 throw std::runtime_error("Texture type mismatch.");
             glFramebufferTexture(GL_FRAMEBUFFER,
                     GL_DEPTH_ATTACHMENT, tex.id(), 0);
+        }
+        if(bt <= 1 << 30 /*color_buffer_n*/) {
+            if(tex.type() != texture::rgba_8888)
+                throw std::runtime_error("Texture type mismatch.");
+            glFramebufferTexture(GL_FRAMEBUFFER,
+                    GL_COLOR_ATTACHMENT0 + int(log2(bt)), tex.id(), 0);
         }
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -417,7 +444,7 @@ protected:
     GLuint program_id_;
 
     std::map<std::string, buffer_ptr> uniform_blocks_;
-    std::vector<std::pair<std::string, texture const *>> texture_bindings_;
+    std::map<std::string, texture const *> texture_bindings_;
 
 public:
     program(GLuint pgid) : program_id_(pgid) { }
@@ -457,7 +484,7 @@ public:
 
     void uniform(const std::string& name, const texture& tex) {
         // store the binding pair. decide mount point on rendering
-        texture_bindings_.push_back(make_pair(name, &tex));
+        texture_bindings_[name] = &tex;
     }
 
     void render(const frame_buffer& fb, const vertex_array& vao,
@@ -465,20 +492,22 @@ public:
         glBindFramebuffer(GL_FRAMEBUFFER, fb.id());
         glDrawBuffer(GL_BACK);
 
-        if(clear & frame_buffer::color_buffer)
+        if(clear & ~frame_buffer::depth_buffer) // buffers other than depth
             glClear(GL_COLOR_BUFFER_BIT);
         if(clear & frame_buffer::depth_buffer)
             glClear(GL_DEPTH_BUFFER_BIT);
 
         glUseProgram(program_id_);
 
-        for(size_t i = 0; i < texture_bindings_.size(); i++) {
+        size_t i = 0;
+        for(auto p : texture_bindings_) {
             glActiveTexture(GL_TEXTURE0 + i);
-            glBindTexture(GL_TEXTURE_2D, texture_bindings_[i].second->id());
-            GLint loc = glGetUniformLocation(program_id_,
-                    texture_bindings_[i].first.c_str());
+            glBindTexture(GL_TEXTURE_2D, p.second->id());
+            GLint loc = glGetUniformLocation(program_id_, p.first.c_str());
             if(loc < 0) throw std::runtime_error("No such uniform");
             glUniform1i(loc, i);
+
+            i++;
         }
 
         glBindVertexArray(vao.id());

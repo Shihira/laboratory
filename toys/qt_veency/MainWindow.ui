@@ -42,19 +42,40 @@
     <addaction name="actionConnect"/>
     <addaction name="separator"/>
     <addaction name="actionSwitch_Keyboard"/>
+    <addaction name="actionToggle_VS_Entry"/>
    </widget>
    <addaction name="menuGo"/>
    <addaction name="menuSettings"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <action name="actionConnect">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
    <property name="text">
     <string>&amp;Connect</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+N</string>
    </property>
   </action>
   <action name="actionSwitch_Keyboard">
    <property name="text">
     <string>&amp;Switch Keyboard</string>
+   </property>
+  </action>
+  <action name="actionToggle_VS_Entry">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Toggle VS Entry</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+E</string>
    </property>
   </action>
  </widget>

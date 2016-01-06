@@ -75,6 +75,7 @@ void g_destroy(graph* g);
 void g_dfs(graph* g, gnode* sp, void (*cb) (gnode*, void*), void* usr);
 int g_dijkstra(graph* g, gnode* sp, gnode* ep, lnklist/*<gnode*>*/* path);
 void g_kruskal(graph* g, graph* st);
+void g_prim(graph* g, graph* st);
 
 // requires manual free
 void g_dump(graph* g, varray* buf, void (*quote) (varray*, gnode*));

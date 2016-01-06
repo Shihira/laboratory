@@ -102,6 +102,8 @@ public:
 
     void run() {
         SDL_Event e;
+
+        clock_t t = clock();
         while(true) {
             SDL_PollEvent(&e);
 
@@ -120,9 +122,15 @@ public:
                     e.button.x, e.button.y, (mouse_button)e.button.button);
             }
 
-            if(_on_paint) _on_paint();
-            
-            SDL_Delay(16);
+            if(clock() - t >= 0.016 * CLOCKS_PER_SEC && _on_paint) {
+                t = clock();
+                _on_paint();
+            }
+
+            /*
+            int c = 16 - 1000 * double(clock() - t) / CLOCKS_PER_SEC;
+            SDL_Delay(c < 0 ? 0 : c > 16 ? 16 : c);
+            */
         }
     }
 

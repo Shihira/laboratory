@@ -68,10 +68,13 @@ make_cube(col<3> a, col<3> b)
 }
 
 #define clamp_(i, mini, maxi) ((i)<(mini)?(mini):((i)>(maxi)?(maxi):(i)))
-#define i_(x, y) (clamp_(x, 0, 39) * 40 + clamp_(y, 0, 39))
+#define i_(x, y) (clamp_((x), 0, subd*2-1) * subd*2 + clamp_((y), 0, subd*2-1))
 
-int main()
+int main(int argc, char** argv)
 {
+    int mode = 1; // film mode
+    if(argc > 1) mode = min(1, atoi(argv[1]));
+
     windowgl w("Water Pool", 0x0303);
     w.init_glew();
 
@@ -79,6 +82,7 @@ int main()
     glClearDepth(1);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     ifstream vert_shader("waterpool-vert.glsl");
     ifstream frag_shader("waterpool-frag.glsl");
@@ -92,35 +96,50 @@ int main()
         ));
     program prog = link(vs, fs);
 
+    const int subd = 20;
+
     vector<col<4>> triangles;
     vector<col<3>> normals;
     vector<int> height_indices;
-    vector<float> height(1600, 0);
-    vector<float> height_temp(1600, 0);
-    vector<float> velocity(1600, 0);
+    vector<float> height(subd * subd * 4, 0);
+    vector<float> height_temp(subd * subd * 4, 0);
+    vector<float> velocity(subd * subd * 4, 0);
 
-    for(int i = -20; i < 20; i++)
-    for(int j = -20; j < 20; j++) {
-        vector<col<4>> tris;
-        vector<col<3>> nmls;
-        tie(tris, nmls) = make_cube(
-                col<3>{double(i), 0, double(j)},
-                col<3>{i + 1., 10, j + 1.});
+    for(int i = -subd; i < subd; i++)
+    for(int j = -subd; j < subd; j++) {
+        int ind = i_(i + subd, j + subd);
 
-        int ind = i_(i + 20, j + 20);
+        if(mode == 0) {
+            vector<col<4>> tris;
+            vector<col<3>> nmls;
+            tie(tris, nmls) = make_cube(
+                    col<3>{double(i), 0, double(j)},
+                    col<3>{i + 1., 10, j + 1.});
 
-        for(col<4>& t : tris) {
-            triangles.push_back(t);
-            height_indices.push_back(t[1] > 5 ? ind : -1);
+            for(col<4>& t : tris) {
+                triangles.push_back(t);
+                height_indices.push_back(t[1] > 5 ? ind : -1);
+            }
+            for(col<3>& n : nmls) normals.push_back(n);
+        } else {
+            triangles.push_back(col<4>{i * 1., 0, j * 1., 1});
+            triangles.push_back(col<4>{i + 1., 0, j * 1., 1});
+            triangles.push_back(col<4>{i + 1., 0, j + 1., 1});
+            triangles.push_back(col<4>{i + 1., 0, j + 1., 1});
+            triangles.push_back(col<4>{i * 1., 0, j + 1., 1});
+            triangles.push_back(col<4>{i * 1., 0, j * 1., 1});
+            height_indices.push_back(i_(i+subd, j+subd));
+            height_indices.push_back(i_(i+subd+1, j+subd));
+            height_indices.push_back(i_(i+subd+1, j+subd+1));
+            height_indices.push_back(i_(i+subd+1, j+subd+1));
+            height_indices.push_back(i_(i+subd, j+subd+1));
+            height_indices.push_back(i_(i+subd, j+subd));
         }
-        for(col<3>& n : nmls) normals.push_back(n);
-
-        height[ind] = 0;
     }
 
     vertex_array vao;
     vao.input(0, triangles);
-    vao.input(1, normals);
+    if(mode == 0) vao.input(1, normals);
     vao.input(2, height_indices);
 
     matrix<4, 4>
@@ -132,13 +151,14 @@ int main()
         mat_proj = transform::perspective(M_PI / 4, 4. / 3, 1, 100);
 
     prog.uniform_block("matrices", make_tuple(mat_modl, mat_view, mat_proj));
-    prog.uniform_block("light", col<4>{2, 15, 5, 1});
-    prog.uniform("waveHeight", height);
+    prog.uniform_block("light", col<4>{5, 20, -20, 1});
+    prog.uniform("height", height);
+    prog.uniform("mode", mode);
 
     app().register_on_paint([&]() {
-        for(int i = 0; i < 40; i++)
-        for(int j = 0; j < 40; j++) {
-            const static double c = 1;
+        for(int i = 0; i < subd * 2; i++)
+        for(int j = 0; j < subd * 2; j++) {
+            const static double c = 1.5;
             const static double dx = 1;
             const static double dt = 0.1;
             double f = c * c / (dx * dx) * (
@@ -147,13 +167,13 @@ int main()
                     4 * height[i_(i, j)]);
             velocity[i_(i, j)] += f * dt; 
             if(i == 0 || i == 39 || j == 0  || j == 39)
-                velocity[i_(i, j)] *= 1.01;
-            velocity[i_(i, j)] *= 0.995;
+                velocity[i_(i, j)] *= 1.02;
+            velocity[i_(i, j)] *= 0.990;
             height_temp[i_(i, j)] = height[i_(i, j)] + velocity[i_(i, j)] * dt;
         }
 
         swap(height_temp, height);
-        prog.uniform("waveHeight", height);
+        prog.uniform("height", height);
 
         prog.render(frame_buffer::screen, vao);
 
@@ -181,10 +201,12 @@ int main()
 
         cout << p << endl;
 
-        for(int i = -5; i < 5; i++)
-        for(int j = -5; j < 5; j++)
-            height[i_(i + int(p[0] + 20), j + int(p[2]) + 20)] =
-                (8 - sqrt(i * i + j * j)) * 3;
+        for(int i = -2; i < 2; i++)
+        for(int j = -2; j < 2; j++) {
+            double r = sqrt(i * i + j * j);
+            height[i_(i + int(p[0] + subd), j + int(p[2]) + subd)] =
+                2 * 1.414 - r;
+        }
 
         prev_x = x;
         prev_y = y;

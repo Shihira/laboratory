@@ -7,17 +7,17 @@
 
 #include "include/image.h"
 #include "include/util.h"
-#include "include/util.h"
+#include "include/model.h"
 
 using namespace std;
 
-#define F faces[face_i]
+#define F faces_[face_i]
 #define FN fnormals[face_i]
 #define FC fcolors[face_i]
-#define V(fe) vertices[std::get<0>(fe)]
-#define VN(fe) normals[std::get<1>(fe)]
+#define V(fe) vertices_[std::get<0>(fe)]
+#define VN(fe) normals_[std::get<1>(fe)]
 
-class renderer : public model {
+class renderer : public wavefront_model {
 public:
     image& img;
 
@@ -31,7 +31,7 @@ public:
     }
 
     void _gen_fnormals() {
-        for(face& f : faces) {
+        for(face& f : faces_) {
             assert(f.size() >= 3);
 
             col<3> v1 = V(f[1]).reduce() - V(f[0]).reduce();
@@ -83,7 +83,7 @@ public:
         min_a = 1e8;
         size_t min_face_i = ~0UL;
 
-        for(size_t face_i = 0; face_i < faces.size(); face_i++) {
+        for(size_t face_i = 0; face_i < faces_.size(); face_i++) {
             double a = intersection(face_i, p, u);
 
             if(a < 0 || a > min_a) continue;
@@ -101,9 +101,9 @@ public:
     void multiply(const matrix<4, 4>& mat) {
         matrix<4, 4> mat_1_t = mat.inverse().t();
 
-        for(vertex& v : vertices)
+        for(vertex& v : vertices_)
             v = mat * v.to_mat();
-        for(normal& n : normals) {
+        for(normal& n : normals_) {
             n = col<4>(mat_1_t * n.to_vec<4>().to_mat()).to_vec<3>();
             n = n * (1/n.abs());
         }
@@ -223,9 +223,9 @@ int main(int argc, char* argv[])
     };
 
     /*
-    double avr_x = m.statistic(model::avr_x);
-    double avr_y = m.statistic(model::avr_y);
-    double avr_z = m.statistic(model::avr_z);
+    double avr_x = m.statistic(wavefront_model::avr_x);
+    double avr_y = m.statistic(wavefront_model::avr_y);
+    double avr_z = m.statistic(wavefront_model::avr_z);
     */
 
     using namespace transform;

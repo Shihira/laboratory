@@ -40,6 +40,7 @@ gnode* g_add_node(graph* g, void* data)
 {
     gnode n;
     n.data = (uint8_t*)malloc(g->elem_size);
+    n.rsrv = NULL;
     if(!n.data) toss(MemoryFault);
     if(data) memcpy(n.data, data, g->elem_size);
 
@@ -326,6 +327,99 @@ void g_kruskal(graph* g, graph/*<gnode*>*/* st)
     g_destroy(ufs);
     ll_destroy(info_buf);
     va_destroy(edges);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Prim's Algorit
+
+#define castp_prim(p) ((prim_info*)(p))
+#define castp_primp(p) (*(prim_info**)(p))
+
+typedef struct prim_info_t {
+    gnode/*<gnode*>*/* st_n;
+    size_t hpos; // position in the heap. It's clear that as long as an algorithm
+              // requires updating heaps, you need its current position.
+    gedge* backtrace; // source of the distance below
+    int distance;
+    unsigned visited;
+} prim_info;
+
+static int prim_cmp_(void* l, void* r)
+{
+    // minimum heap comparator
+    int dist_l = castp_primp(l)->distance;
+    int dist_r = castp_primp(r)->distance;
+
+    return dist_r - dist_l;
+}
+
+static void prim_swp_(varray* va, size_t a, size_t b)
+{
+    castp_primp(va_at(va, a))->hpos = b;
+    castp_primp(va_at(va, b))->hpos = a;
+    va_swap(va, a, b);
+}
+
+static void prim_update_heap_(varray* h, size_t hpos, int dist)
+{
+    prim_info* info = castp_primp(va_at(h, hpos));
+    va_heap_remove_generic(h, prim_cmp_, prim_swp_, hpos);
+    info->distance = dist;
+    // NOT necessary: removal follows swapping to the tail in heap;
+    // thus we append it instantly and then the hpos haven't been changed.
+    info->hpos = h->length;
+    va_heap_insert_generic(h, prim_cmp_, prim_swp_, &info);
+}
+
+void g_prim(graph* g, graph/*<gnode*>*/* st/*SpanTree*/)
+{
+    lnklist* info_buf = ll_create(prim_info);
+    varray* h/*eap*/ = va_create(prim_info*);
+
+    for(ll_iter i = g->nodes->head; !ll_is_end(i); i = i->next) {
+        gnode* n = casti_node(i);
+
+        prim_info info;
+        info.st_n = n;
+        info.visited = 0;
+        info.backtrace = NULL;
+        info.distance = INT_MAX;
+        info.hpos = h->length;
+        ll_prepend(info_buf, &info);
+
+        n->rsrv = ll_at(info_buf, 0);
+        va_append(h, &(n->rsrv)); // need not sort because all are INT_MAX
+    }
+
+    prim_info* info = castp_primp(va_at(h, 0));
+    info->distance = 0; // an arbitary non-max positive number
+
+    while(info->distance != INT_MAX) {
+        gnode* n = info->st_n;
+
+        g_add_node(st, &n);
+        if(info->backtrace)
+            g_connect(st, info->backtrace->head, n, info->backtrace->weight);
+        info->visited = 1;
+        prim_update_heap_(h, info->hpos, INT_MAX);
+
+        for(ll_iter i = edges_out(g, n)->head; !ll_is_end(i); i = i->next) {
+            gedge* scanned_e = casti_edgep(i);
+            gnode* scanned_n = g_endpoint(scanned_e, n);
+            prim_info* scanned_info = castp_prim(scanned_n->rsrv);
+
+            if(!scanned_info->visited &&
+                scanned_e->weight < scanned_info->distance) {
+                scanned_info->backtrace = scanned_e;
+                prim_update_heap_(h, scanned_info->hpos, scanned_e->weight);
+            }
+        }
+
+        info = castp_primp(va_at(h, 0));
+    }
+
+    va_destroy(h);
+    ll_destroy(info_buf);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

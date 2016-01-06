@@ -31,4 +31,5 @@ int cmpi64(void const * a, void const * b)
 DEFREF(refs, char const *)
 DEFREF(refi, int32_t)
 DEFREF(refi64, int64_t)
+DEFREF(refp, void *)
 

@@ -24,6 +24,7 @@ protected:
     // flags
     unsigned buttonState;
     bool singleShift;
+    unsigned lastInside;
 
     QPoint getVeencyCursor();
 

@@ -43,6 +43,7 @@
     <addaction name="separator"/>
     <addaction name="actionSwitch_Keyboard"/>
     <addaction name="actionToggle_VS_Entry"/>
+    <addaction name="actionKeep_Screen_On"/>
    </widget>
    <addaction name="menuGo"/>
    <addaction name="menuSettings"/>
@@ -72,10 +73,24 @@
     <bool>true</bool>
    </property>
    <property name="text">
-    <string>Toggle VS Entry</string>
+    <string>&amp;Toggle VS Entry</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+E</string>
+   </property>
+  </action>
+  <action name="actionKeep_Screen_On">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Keep Screen On</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+S</string>
    </property>
   </action>
  </widget>

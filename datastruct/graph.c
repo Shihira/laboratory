@@ -451,6 +451,7 @@ void ufs_union(graph* ufs, gnode* n1, gnode* n2)
 {
     gnode* n1_anc = ufs_find(ufs, n1);
     gnode* n2_anc = ufs_find(ufs, n2);
+    if(n1_anc == n2_anc) return;
     g_disconnect(ufs, casti_edgep(edges_out(ufs, n2_anc)->head));
     g_connect(ufs, n2_anc, n1_anc, 1);
 }

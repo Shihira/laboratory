@@ -5,11 +5,13 @@
 #include "MainWindow.h"
 
 #include <iostream>
+#include <ctime>
 
 using namespace std;
 
-MainWindow::MainWindow()
-    : buttonState(0), singleShift(false), cl(nullptr)
+MainWindow::MainWindow() :
+    buttonState(0), singleShift(false),
+    lastInside(time(NULL)), cl(nullptr)
 {
     form.setupUi(this);
     cursorPulse = new QTimer(this);
@@ -84,8 +86,8 @@ QPoint MainWindow::getVeencyCursor()
 {
     if(!form.actionToggle_VS_Entry->isChecked()) {
         QPoint orgPos = QCursor::pos();
-        if(orgPos.x() > 1365 && orgPos.y() < 700)
-            orgPos.setX(1365);
+        if(orgPos.x() > 1367)
+            orgPos.setX(1367);
         QCursor::setPos(orgPos);
     }
 
@@ -93,7 +95,9 @@ QPoint MainWindow::getVeencyCursor()
     QRect rt = form.centralwidget->geometry();
 
     p = p - geometry().topLeft() - rt.topLeft();
-    if(p.x() < 0) p.setX(0);
+    if(p.x() < 0) p.setX(0); 
+    if(p.x() > 0 || form.actionKeep_Screen_On->isChecked())
+        lastInside = time(NULL);
     if(p.y() < 0) p.setY(0);
     if(p.x() >= rt.width()) p.setX(rt.width());
     if(p.y() >= rt.height()) p.setY(rt.height());
@@ -114,6 +118,8 @@ void MainWindow::sendCursorPos(QPoint p, unsigned mask)
     }
 
     if(!cl) return;
+
+    if(time(NULL) - lastInside > 15) return;
 
     SendPointerEvent(cl, p.x(), p.y(), buttonState);
 }
@@ -172,13 +178,13 @@ void MainWindow::mouseReleaseEvent(QMouseEvent* event)
     */
     if(event->button() & Qt::RightButton) {
         cursorPulse->stop();
-        sendCursorClick(QPoint(910, 1950));
+        sendCursorClick(QPoint(1450, 1950));
         QTimer::singleShot(500, [this]()
             { sendCursorClick(QPoint(567, 1024)); finishedMotion(); });
     }
     if(event->button() & Qt::MiddleButton) {
         cursorPulse->stop();
-        sendCursorClick(QPoint(910, 1950));
+        sendCursorClick(QPoint(1450, 1950));
         QTimer::singleShot(500, [this]()
             { sendCursorClick(QPoint(625, 1248)); finishedMotion(); });
     }

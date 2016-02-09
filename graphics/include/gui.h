@@ -10,6 +10,8 @@
 
 #include "image.h"
 
+#define SDL_USEREVENT_REPAINT 0
+
 class window {
 protected:
     SDL_Window* _window;
@@ -18,7 +20,7 @@ protected:
     window() {
         static bool sdl_has_init = false;
         if(!sdl_has_init) {
-            if(SDL_Init(SDL_INIT_VIDEO) < 0)
+            if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) < 0)
                 throw std::runtime_error("Failed to initialize SDL.");
             atexit(SDL_Quit);
         }
@@ -69,9 +71,10 @@ public:
 class application {
 public:
     enum mouse_button {
-        left_button = SDL_BUTTON_LEFT,
-        right_button = SDL_BUTTON_RIGHT,
-        middle_button = SDL_BUTTON_MIDDLE,
+        none = 0,
+        left_button = SDL_BUTTON_LMASK,
+        right_button = SDL_BUTTON_RMASK,
+        middle_button = SDL_BUTTON_MMASK,
     };
 
 private:
@@ -82,8 +85,23 @@ private:
     std::function<void(void)> _on_exit;
     std::function<void(int, int, mouse_button)> _on_mouse_down;
     std::function<void(int, int, mouse_button)> _on_mouse_up;
+    std::function<void(int, int, uint32_t)> _on_mouse_move;
+
+    uint32_t fps_ = 60;
+
+    static uint32_t paint_timer_cb_(uint32_t interval, void* paint_cb) {
+        SDL_Event e;
+        e.type = SDL_USEREVENT;
+        e.user.type = SDL_USEREVENT;
+        e.user.code = SDL_USEREVENT_REPAINT;
+
+        SDL_PushEvent(&e);
+
+        return interval;
+    }
 
 public:
+
     void register_on_paint(std::function<void(void)> func) {
         _on_paint = func;
     }
@@ -100,12 +118,22 @@ public:
         _on_mouse_up = func;
     }
 
+    void register_on_mouse_move(decltype(_on_mouse_move) func) {
+        _on_mouse_move = func;
+    }
+
+    void set_fps(uint32_t fps) { fps_ = fps; }
+    uint32_t fps() { return fps_; }
+
     void run() {
         SDL_Event e;
 
-        clock_t t = clock();
+        int timer = SDL_AddTimer(1000 / fps_, paint_timer_cb_, NULL);
+        uint32_t tick = SDL_GetTicks();
+
         while(true) {
-            SDL_PollEvent(&e);
+            int has_event = SDL_WaitEvent(&e);
+            if(!has_event) break;
 
             if(e.type == SDL_QUIT) {
                 if(_on_exit) _on_exit();
@@ -113,25 +141,38 @@ public:
             }
 
             if(e.type == SDL_MOUSEBUTTONUP) {
-                if(_on_mouse_up) _on_mouse_up(
-                    e.button.x, e.button.y, (mouse_button)e.button.button);
+                if(_on_mouse_up) _on_mouse_up(e.button.x, e.button.y,
+                    e.button.button == SDL_BUTTON_LEFT ? left_button :
+                    e.button.button == SDL_BUTTON_RIGHT ? right_button :
+                    e.button.button == SDL_BUTTON_MIDDLE ? middle_button :
+                    none);
             }
 
             if(e.type == SDL_MOUSEBUTTONDOWN) {
-                if(_on_mouse_down) _on_mouse_down(
-                    e.button.x, e.button.y, (mouse_button)e.button.button);
+                if(_on_mouse_down) _on_mouse_down(e.button.x, e.button.y,
+                    e.button.button == SDL_BUTTON_LEFT ? left_button :
+                    e.button.button == SDL_BUTTON_RIGHT ? right_button :
+                    e.button.button == SDL_BUTTON_MIDDLE ? middle_button :
+                    none);
             }
 
-            if(clock() - t >= 0.016 * CLOCKS_PER_SEC && _on_paint) {
-                t = clock();
-                _on_paint();
+            if(e.type == SDL_MOUSEMOTION) {
+                if(_on_mouse_move) _on_mouse_move(e.motion.x, e.motion.y,
+                        e.motion.state);
             }
 
-            /*
-            int c = 16 - 1000 * double(clock() - t) / CLOCKS_PER_SEC;
-            SDL_Delay(c < 0 ? 0 : c > 16 ? 16 : c);
-            */
+            if(e.type == SDL_USEREVENT) {
+                if(e.user.code == SDL_USEREVENT_REPAINT) {
+                    if(_on_paint) {
+                        uint32_t d_tick = (SDL_GetTicks() - tick) / 16;
+                        _on_paint();
+                        tick += d_tick * 16;
+                    }
+                }
+            }
         }
+
+        SDL_RemoveTimer(timer);
     }
 
     static application& instance() {

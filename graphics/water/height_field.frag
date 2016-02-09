@@ -7,8 +7,8 @@ layout(location = 0) out vec4 outInfo;
 
 in vec2 uvcoord;
 
-const float v = 3;
-const float dt = 0.2;
+const float v = 3.2;
+const float dt = 0.22;
 
 void main()
 {
@@ -18,9 +18,6 @@ void main()
 
     outInfo = texture(heightFields, uvcoord);
 
-    outInfo.g -= 0.5;
-    outInfo.r -= 0.5;
-
     vec4 adjInfo[4];
     float f = 0;
     for(int i = 0; i < 4; i++) {
@@ -29,16 +26,13 @@ void main()
         uvcoord_i.y = clamp(uvcoord_i.y, cellSize, 1 - cellSize);
 
         adjInfo[i] = texture(heightFields, uvcoord_i);
-        f += adjInfo[i].r - 0.5;
+        f += adjInfo[i].r;
     }
 
     f -= 4 * outInfo.r;
     f *= v * v;
 
     outInfo.g += f * dt;
-    outInfo.g *= 0.995;
+    outInfo.g *= 0.998;
     outInfo.r += outInfo.g * dt;
-
-    outInfo.g += 0.5;
-    outInfo.r += 0.5;
 }

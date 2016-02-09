@@ -1,6 +1,8 @@
 /*
  * Copyright(c) 2015, Shihira Fung <fengzhiping@hotmail.com>
  */
+#ifndef MODEL_H_INCLUDED
+#define MODEL_H_INCLUDED
 
 #include <fstream>
 #include <sstream>
@@ -42,6 +44,9 @@ public:
     void subdivide(size_t w, size_t h) {
         df_dx_ = df_dx_ * (1.0 / w);
         df_dy_ = df_dy_ * (1.0 / h);
+
+        grid_h_ *= h;
+        grid_w_ *= w;
     }
 
     std::vector<col<4>> triangles() const {
@@ -330,3 +335,4 @@ public:
     decltype(faces_)& get_meshes() { return faces_; }
 };
 
+#endif // MODEL_H_INCLUDED

@@ -34,6 +34,7 @@ public:
     enum shader_type_e {
         vertex = GL_VERTEX_SHADER,
         fragment = GL_FRAGMENT_SHADER,
+        geometry = GL_GEOMETRY_SHADER,
     };
 
 };
@@ -89,6 +90,8 @@ template<> struct uniform_helper_<matrix<4, 4>>
     { declare_umat_func_(glUniformMatrix4fv, GLfloat); };
 template<> struct uniform_helper_<col<4>>
     { declare_uvec_func_(glUniform4fv, GLfloat); };
+template<> struct uniform_helper_<col<2>>
+    { declare_uvec_func_(glUniform2fv, GLfloat); };
 template<> struct uniform_helper_<col<1>>
     { declare_uvec_func_(glUniform1fv, GLfloat); };
 template<> struct uniform_helper_<float>
@@ -160,10 +163,10 @@ template<> struct algebraic_cvt_<GLint> {
 };
 
 // tuple encoding: wow. such code. so much ellipsis
-template<typename Head> size_t tuple_size_()
+template<typename Head> constexpr size_t tuple_size_()
     { return algebraic_cvt_<Head>::size(); }
 
-template<typename Head, typename ... Tail>
+template<typename Head, typename ... Tail> constexpr
 typename std::enable_if<(sizeof...(Tail) > 0), size_t>::type tuple_size_()
     { return algebraic_cvt_<Head>::size() + tuple_size_<Tail ...>(); }
 
@@ -172,7 +175,7 @@ typename std::enable_if<I == sizeof...(TupleArgs), void>::type
 tuple_encode_(std::vector<float>& v, const std::tuple<TupleArgs ...>& t) { }
 
 template<size_t I, typename ... TupleArgs>
-typename std::enable_if<I < sizeof...(TupleArgs), void>::type
+typename std::enable_if<(I < sizeof...(TupleArgs)), void>::type
 tuple_encode_(std::vector<float>& v, const std::tuple<TupleArgs ...>& t) {
     std::vector<float> tmp = algebraic_cvt_<typename std::tuple_element<
         I, std::tuple<TupleArgs ...>>::type>::encode(std::get<I>(t));
@@ -187,8 +190,8 @@ struct algebraic_cvt_<std::tuple<Args ...>> {
     typedef std::tuple<Args ...> elem_type;
     typedef std::tuple<Args ...> value_type;
     typedef std::vector<float> raw_type;
-    static size_t count(const value_type&) { return 1; }
-    static size_t size() { return tuple_size_<Args ...>(); }
+    constexpr static size_t count(const value_type&) { return 1; }
+    constexpr static size_t size() { return tuple_size_<Args ...>(); }
     static raw_type encode(const value_type& t) {
         raw_type v;
         tuple_encode_<0>(v, t);
@@ -207,7 +210,7 @@ struct algebraic_cvt_<std::vector<T>> {
         for(const T& e : v) c += algebraic_cvt_<T>::count(e);
         return c;
     }
-    static size_t size() { return algebraic_cvt_<T>::size(); }
+    constexpr static size_t size() { return algebraic_cvt_<T>::size(); }
     static raw_type encode(const value_type& v) {
         raw_type raw_v;
         for(const T& e : v) {
@@ -218,44 +221,81 @@ struct algebraic_cvt_<std::vector<T>> {
     }
 };
 
+template<> struct algebraic_cvt_<color> {
+    enum { gl_elem_type = GL_UNSIGNED_BYTE };
+    typedef color elem_type;
+    typedef color value_type;
+    typedef std::vector<uint8_t> raw_type;
+    constexpr static size_t count(const value_type& c) { return 1; }
+    constexpr static size_t size() { return 4; }
+    static raw_type encode(const value_type& c) {
+        raw_type raw_v;
+        raw_v.push_back(c.r);
+        raw_v.push_back(c.g);
+        raw_v.push_back(c.b);
+        raw_v.push_back(c.a);
+        return raw_v;
+    }
+};
+
 /**********************************************************/
+
+template<size_t Size> struct texture_format_ { };
+template<> struct texture_format_<1> { enum { format = GL_RED }; };
+template<> struct texture_format_<2> { enum { format = GL_RG }; };
+template<> struct texture_format_<3> { enum { format = GL_RGB }; };
+template<> struct texture_format_<4> { enum { format = GL_RGBA }; };
 
 class texture {
 public:
     enum component {
-        rgba_8888 = 0,
-        depth_32 = 1,
+        rgba_8888 = GL_RGBA8,
+        rgb_888   = GL_RGB8,
+        rg_88     = GL_RG8,
+        r_8       = GL_R8,
+        rgba_ffff = GL_RGBA32F,
+        rgb_fff   = GL_RGB32F,
+        rg_ff     = GL_RG32F,
+        r_f       = GL_R32F,
+        depth_f = GL_DEPTH_COMPONENT32F,
     };
 
 protected:
     GLuint texture_id_;
     component comp_;
 
-    static const GLenum tex_param_[2][3];
-
 public:
     texture(GLuint texid) : texture_id_(texid) { }
     texture(const texture& tex) = delete;
     texture(texture&& tex) : texture_id_(tex.texture_id_)
-        { tex.texture_id_ = 0; }
+        { tex.texture_id_ = 0; /*prevent deletion*/ }
 
-    texture(const image& img) {
+    template<typename T>
+    texture(const T& img, component comp = rgba_8888) {
+        comp_ = comp;
+
         glGenTextures(1, &texture_id_);
-
         bitblt(img);
     }
 
-    void bitblt(const image& img) {
-        comp_ = rgba_8888;
-
+    template<typename T>
+    void bitblt(const T& img, size_t width) {
+        if(algebraic_cvt_<T>::count(img) % width)
+            throw std::runtime_error("Image is not a rectangle.");
+        size_t height = algebraic_cvt_<T>::count(img) / width;
+        auto data = algebraic_cvt_<T>::encode(img);
         glBindTexture(GL_TEXTURE_2D, texture_id_);
-        glTexImage2D(GL_TEXTURE_2D, 0, tex_param_[comp_][0],
-                img.width(), img.height(), 0, tex_param_[comp_][1],
-                tex_param_[comp_][2], img.buffer().data());
+        glTexImage2D(GL_TEXTURE_2D, 0, GLenum(comp_), width, height, 0,
+                texture_format_<algebraic_cvt_<T>::size()>::format,
+                algebraic_cvt_<T>::gl_elem_type, data.data());
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glGenerateMipmap(GL_TEXTURE_2D);
         glBindTexture(GL_TEXTURE_2D, 0);
+    }
+
+    void bitblt(const image& img) {
+        bitblt(img.buffer(), img.width());
     }
 
     texture(int w, int h, component comp = rgba_8888) {
@@ -263,9 +303,11 @@ public:
 
         glGenTextures(1, &texture_id_);
         glBindTexture(GL_TEXTURE_2D, texture_id_);
-        glTexImage2D(GL_TEXTURE_2D, 0, tex_param_[comp][0],
-                w, h, 0, tex_param_[comp][1],
-                tex_param_[comp][2], 0);
+        glTexImage2D(GL_TEXTURE_2D, 0, comp_, w, h, 0,
+                // Since there is no data transfer, besides depth component
+                // restriction, it is free to specify any format and type. I
+                comp == depth_f ? GL_DEPTH_COMPONENT : GL_RGBA, // use GL_RGBA
+                GL_UNSIGNED_BYTE, 0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glBindTexture(GL_TEXTURE_2D, 0);
@@ -297,11 +339,6 @@ public:
     ~texture() {
         if(texture_id_) glDeleteTextures(0, &texture_id_);
     }
-};
-
-const GLenum texture::tex_param_[2][3] = {
-    { GL_RGBA8, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8_REV, },
-    { GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT, },
 };
 
 class buffer {
@@ -368,14 +405,14 @@ public:
         glBindFramebuffer(GL_FRAMEBUFFER, frame_buffer_id_);
 
         if(bt == depth_buffer) {
-            if(tex.type() != texture::depth_32)
+            if(tex.type() != texture::depth_f)
                 throw std::runtime_error("Texture type mismatch.");
             glFramebufferTexture(GL_FRAMEBUFFER,
                     GL_DEPTH_ATTACHMENT, tex.id(), 0);
         }
         if(bt <= 1 << 30 /*color_buffer_n*/) {
-            if(tex.type() != texture::rgba_8888)
-                throw std::runtime_error("Texture type mismatch.");
+            /*if(tex.type() != texture::rgba_8888)
+                throw std::runtime_error("Texture type mismatch.");*/
             glFramebufferTexture(GL_FRAMEBUFFER,
                     GL_COLOR_ATTACHMENT0 + int(log2(bt)), tex.id(), 0);
         }
@@ -386,6 +423,15 @@ public:
     ~frame_buffer() {
         if(frame_buffer_id_)
             glDeleteFramebuffers(1, &frame_buffer_id_);
+    }
+
+    void clear(color c = 0) {
+        glBindFramebuffer(GL_FRAMEBUFFER, frame_buffer_id_);
+
+        glClearColor(c.r / 255., c.g / 255., c.b / 255., c.a / 255.);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 };
 
@@ -456,8 +502,10 @@ public:
     template<typename T>
     void uniform_block(const std::string& name, const T& v) {
         GLuint loc = glGetUniformBlockIndex(program_id_, name.c_str());
-        if(loc == GL_INVALID_INDEX)
-            throw std::runtime_error("No such uniform block");
+        if(loc == GL_INVALID_INDEX) {
+            std::cerr << "No such uniform block: " << name << std::endl;
+            return;
+        }
 
         buffer_ptr& p = uniform_blocks_[name];
         if(!p) p = buffer_ptr(new buffer());
@@ -473,7 +521,10 @@ public:
     template<typename T>
     void uniform(const std::string& name, const T& v) {
         GLint loc = glGetUniformLocation(program_id_, name.c_str());
-        if(loc < 0) throw std::runtime_error("No such uniform");
+        if(loc < 0) {
+            std::cerr << "No such uniform: " << name << std::endl;
+            return;
+        }
         auto stdvec = algebraic_cvt_<T>::encode(v);
 
         glUseProgram(program_id_);
@@ -504,7 +555,10 @@ public:
             glActiveTexture(GL_TEXTURE0 + i);
             glBindTexture(GL_TEXTURE_2D, p.second->id());
             GLint loc = glGetUniformLocation(program_id_, p.first.c_str());
-            if(loc < 0) throw std::runtime_error("No such uniform");
+            if(loc < 0) {
+                std::cerr << "No such uniform: " << p.first << std::endl;
+                continue;
+            }
             glUniform1i(loc, i);
 
             i++;
@@ -520,12 +574,20 @@ public:
     }
 };
 
-inline program link(const shader& s1, const shader& s2)
+void link_to_program_(GLuint pgid, const shader& s)
+{ glAttachShader(pgid, s.id()); }
+
+template<typename ... ShaderType> inline
+typename std::enable_if<(sizeof...(ShaderType) > 0), void>::type
+link_to_program_(GLuint pgid, const shader& s, ShaderType ... other)
+{ link_to_program_(pgid, s); link_to_program_(pgid, other ...); }
+
+template<typename ... ShaderType>
+inline program link(ShaderType ... ss)
 {
     GLuint pgid = glCreateProgram();
 
-    glAttachShader(pgid, s1.id());
-    glAttachShader(pgid, s2.id());
+    link_to_program_(pgid, ss ...);
 
     glLinkProgram(pgid);
 

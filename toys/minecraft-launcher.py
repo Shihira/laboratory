@@ -1,17 +1,19 @@
 #!/usr/bin/env python
 
 ### Copyright (c) Shihira Fung, 2015 <fengzhiping@hotmail.com>
+### This launcher is compatible with both python 2.x and 3.x
 
 import json
 import platform
 from os import path, listdir, system
+from functools import reduce
 
 #### Options
 USERNAME = "Shihira"
 VERSION = "1.7.10-Forge10.13.3.1388-1.7.10"
 #VERSION = "1.7.10"
-GAMEDIR = "./.minecraft"
-JAVA_PATH = "optirun /usr/java/jdk1.7.0_79/bin/java"
+GAMEDIR = ".minecraft"
+JAVA_PATH = "primusrun /usr/java/jdk1.7.0_79/bin/java"
 PLATFORM = platform.system().lower()
 MEMORY = 1024
 
@@ -60,15 +62,15 @@ class Version:
         lib_version, lib_dir_list = lib_dir_list[-1], lib_dir_list[:-1]
         lib_ava_ver = listdir(path.sep.join(lib_dir_list))
         if lib_version not in lib_ava_ver:
-            print "[WARNING] %s-%s is not found for. Use %s instead." % \
-                    (".".join(lib_dir_list[2:]), lib_version, lib_ava_ver[0])
+            print("[WARNING] %s-%s is not found for. Use %s instead." %
+                    (".".join(lib_dir_list[2:]), lib_version, lib_ava_ver[0]))
             lib_version = lib_ava_ver[0]
         lib_dir = path.sep.join(lib_dir_list + [lib_version])
 
         # proper platform
         jar_ava_ver = listdir(lib_dir)
         jar_version = jar_ava_ver[0]
-        jar_plat_var = filter(lambda j: PLATFORM in j, jar_ava_ver)
+        jar_plat_var = list(filter(lambda j: PLATFORM in j, jar_ava_ver))
         if jar_plat_var: jar_version = jar_plat_var[0]
 
         lib_path = path.join(lib_dir, jar_version)
@@ -124,6 +126,6 @@ if __name__ == '__main__':
     mcargs = MinecraftArguments()
     cmdline = CommandLine(version, mcargs).build()
 
-    print cmdline
+    print(cmdline)
     system(cmdline)
 

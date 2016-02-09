@@ -10,6 +10,7 @@
 #include "../include/gui.h"
 #include "../include/util.h"
 #include "../include/shader.h"
+#include "../include/model.h"
 
 using namespace std;
 using namespace labgl;
@@ -156,7 +157,7 @@ int main()
     ////////////////////////////////////////////////////////////////////////////
     // Read in Model
 
-    model m;
+    wavefront_model m;
     ifstream fobj("../assets/shadow.obj");
     m.read(fobj);
 
@@ -176,7 +177,7 @@ int main()
     ////////////////////////////////////////////////////////////////////////////
     // Transform and render
 
-    texture tex_depth(1024, 1024, texture::depth_32);
+    texture tex_depth(1024, 1024, texture::depth_f);
 
     frame_buffer fbo;
     fbo.bind(frame_buffer::depth_buffer, tex_depth);

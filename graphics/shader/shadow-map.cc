@@ -70,6 +70,7 @@ out vec4 color;
 
 uniform mat4 mmat;
 uniform mat4 lightmvp;
+uniform mat4 lightmv;
 uniform vec4 lightPos;
 
 uniform sampler2D shadowMap;
@@ -80,11 +81,23 @@ void main()
     float diffuse = clamp(dot(normalize(fragNormal), normalize(ray)), 0.1, 1);
 
     vec4 posView = lightmvp * inverse(mmat) * worldPos;
-    vec3 mapCoord = (vec3(1, 1, 1) + posView.xyz / posView.w ) / 2.0;
+    //vec3 mapCoord = (vec3(1, 1, 1) + posView.xyz / posView.w ) / 2.0;
+    vec3 mapCoord = 
+    float lightDepthCenter = texture(shadowMap, mapCoord.xy).r;
 
     float shadow = 0;
+    for(float i = -2; i < 2; i++) {
+        for(float j = -2; j < 2; j++) {
+            vec2 coord = mapCoord.xy + vec2(i * 1./512, j * 1./512);
+            float lightDepth = texture(shadowMap, coord).r;
+            shadow += step(mapCoord.z, lightDepth + 0.001);
+        }
+    }
+    shadow /= 25.0;
+    /*
     float lightDepth = texture(shadowMap, mapCoord.xy).r;
     shadow = step(mapCoord.z, lightDepth + 0.001);
+    */
 
     diffuse *= clamp(shadow, 0.3, 1);
     diffuse = clamp(diffuse, 0.1, 1);
@@ -202,6 +215,7 @@ int main()
         prog_main.uniform("mvp", pmat * mmat);
         prog_main.uniform("mmat", mmat);
         prog_main.uniform("lightmvp", pmat_light * mmat_light);
+        prog_main.uniform("lightmv", mmat_light);
         prog_main.uniform("lightPos", col<4>(mmat * mmat_light.inverse()
                 * matrix<4, 1>{ 0, 0, 0, 1 }));
         prog_main.uniform("shadowMap", tex_depth);

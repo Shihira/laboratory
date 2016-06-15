@@ -27,25 +27,25 @@ public:
 
     point operator=(const point& other)
         { x = other.x; y = other.y; return *this; }
-    point operator+(const point& other)
+    point operator+(const point& other) const
         { return { x + other.x, y + other.y }; }
-    point operator-(const point& other)
+    point operator-(const point& other) const
         { return { x - other.x, y - other.y }; }
     point operator+=(const point& other)
         { x += other.x; y += other.y; return *this; } 
 
-    double operator|(const point& other) { // NORM
+    double operator|(const point& other) const { // NORM
         double dx = x - other.x;
         double dy = y - other.y;
 
         return std::sqrt(dx * dx + dy * dy);
     }
 
-    point operator*(double coefficient)
+    point operator*(double coefficient) const
         { return { coefficient * x, coefficient * y }; }
 };
 
-inline point operator*(const point& p, double coefficient)
+inline point operator*(double coefficient, const point& p)
     { return p * coefficient; }
 
 inline std::ostream& operator<<(std::ostream& s, const point& p)

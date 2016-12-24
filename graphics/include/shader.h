@@ -414,7 +414,7 @@ public:
             /*if(tex.type() != texture::rgba_8888)
                 throw std::runtime_error("Texture type mismatch.");*/
             glFramebufferTexture(GL_FRAMEBUFFER,
-                    GL_COLOR_ATTACHMENT0 + int(log2(bt)), tex.id(), 0);
+                    GL_COLOR_ATTACHMENT0 + int(log2(double(bt))), tex.id(), 0);
         }
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);

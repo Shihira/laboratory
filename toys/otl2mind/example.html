@@ -1,0 +1,178 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <style>
+    body {
+      font-family: sans;
+      background-color: #222;
+      overflow: scroll;
+    }
+
+    .node {
+      align-self: center;
+      border-radius: 3px;
+      border: none;
+      background-color: #ABE2CA;
+      padding-top: 8px;
+      padding-bottom: 8px;
+      padding-left: 12px;
+      padding-right: 12px;
+
+      box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.7);
+
+      max-width: 350px;
+      min-width: 100px;
+    }
+
+    .node p {
+      margin: 0px;
+    }
+
+    .node blockquote {
+      margin-left: 0px;
+      margin-right: 0px;
+      margin-top: 0px;
+      margin-bottom: 0px;
+
+      padding: 5px;
+
+      background-color: rgba(0, 0, 0, 0.2);
+      border-radius: 3px;
+    }
+
+    .node-children {
+      align-self: center;
+      padding-left: 0px;
+    }
+
+    .node-children li {
+      display: flex;
+      flex-direction: row-reverse;
+
+      margin-bottom: 4px;
+      margin-top: 4px;
+    }
+
+    .node-arc {
+      width: 70px;
+      min-width: 70px;
+    }
+
+    #tree {
+      position: absolute;
+    }
+  </style>
+</head>
+<body>
+  <div id="tree">
+    <ul>
+      <li>Root
+        <ul>
+          <li>First
+            <ul>
+              <li>Hello</li>
+              <li>World</li>
+            </ul>
+          </li>
+          <li>
+            <b>Title</b><br/>
+            <span>Paragraph paragraph paragraph paragraph.</span>
+            <ul>
+              <li>Item 1</li>
+              <li>Item 2</li>
+              <li>Item 3</li>
+              <li>Item 4</li>
+              <li>Item 5</li>
+              <li>Item 6</li>
+            </ul>
+          </li>
+        </ul>
+      </li>
+    </ul>
+  <div>
+<script src="jquery.min.js"></script>
+<script src="markdown-it.min.js"></script>
+<script>
+//////////////////////////////////////////////////////////////////////////////
+// initialize docment structure
+$.fn.makeMind = function() {
+  this.find("ul").addClass("node-children");
+
+  this.find(".node-children > li").each(function() {
+    $(this).contents()
+      .not(function() { return $(this).hasClass("node-children"); })
+      .wrapAll('<div class="node"></div>');
+
+    if($(this).children(".node-children").length) {
+      $(this).children(".node").after('<canvas class="node-arc"></canvas>');
+    }
+  });
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// paint curves
+$.fn.paintCurves = function() {
+  this.find(".node-arc").each(function() {
+    var
+      _w = $(this).width(),
+      _h = $(this).parent().height(),
+      _t = $(this).offset().top;
+    this.width = _w;
+    this.height = _h;
+    this.style.height = _h;
+
+    function ctr_y(elem) {
+      return elem.offset().top + elem.outerHeight() / 2
+    };
+
+    var np_pos = ctr_y($(this).prev(".node")) - _t;
+    var nc_pos = [];
+
+    $(this)
+      .next(".node-children")
+      .children()
+      .children(".node")
+      .each(function() { nc_pos.push(ctr_y($(this)) - _t); });
+
+    var ctx = this.getContext('2d');
+
+    ctx.fillStyle = "#4863A0";
+
+    for(i in nc_pos) {
+      var cpb, cpe;
+
+      if(nc_pos[i] > np_pos + 100) { cpb = 25; cpe = 20; }
+      else if(nc_pos[i] < np_pos - 100) { cpb = 20; cpe = 25; }
+      else { cpb = 23; cpe = 23; }
+
+      ctx.moveTo(0, np_pos - 4);
+      ctx.bezierCurveTo(
+        cpb, np_pos - 4,
+        _w - cpe, nc_pos[i] - 1,
+        _w, nc_pos[i] - 1);
+      ctx.lineTo(_w, nc_pos[i] + 1);
+      ctx.bezierCurveTo(
+        _w - cpb, nc_pos[i] + 1,
+        cpe, np_pos + 4,
+        0, np_pos + 4);
+      ctx.closePath();
+      ctx.fill();
+    }
+  });
+};
+
+$.ajax({
+    url: "operating-system.mkd",
+    dataType: "text"
+}).done(function(data) {
+  var conv = new markdownit({ breaks: true });
+  var html = conv.render(data);
+  $("#tree").html(html);
+  $("#tree").makeMind();
+  $("#tree").paintCurves();
+});
+
+</script>
+</body>
+</html>

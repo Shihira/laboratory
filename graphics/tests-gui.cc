@@ -73,8 +73,8 @@ int main(int argc, char** argv)
 
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
-        gluPerspective(60, 1.33, 100, 5000);
-        gluLookAt(0, 0, -400, 0, 0, 0, 0, 1, 0);
+        gluPerspective(60, 1.33, 1, 5000);
+        gluLookAt(0, 0, -3, 0, 0, 0, 0, 1, 0);
 
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();

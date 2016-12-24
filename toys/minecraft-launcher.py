@@ -13,7 +13,7 @@ USERNAME = "Shihira"
 VERSION = "1.7.10-Forge10.13.3.1388-1.7.10"
 #VERSION = "1.7.10"
 GAMEDIR = ".minecraft"
-JAVA_PATH = "primusrun /usr/java/jdk1.7.0_79/bin/java"
+JAVA_PATH = "/usr/java/jdk1.7.0_79/bin/java"
 PLATFORM = platform.system().lower()
 MEMORY = 1024
 

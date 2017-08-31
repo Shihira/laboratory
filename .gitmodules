@@ -1,0 +1,4 @@
+[submodule "shrtool"]
+	path = common
+	url = git@github.com:Shihira/shader-tool.git
+	branch = commonlib

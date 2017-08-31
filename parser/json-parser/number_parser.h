@@ -5,7 +5,7 @@
  * Copyright (c) Shihira Fung, 2015
  */
 
-#include "df_automata.h"
+#include "../df_automata.h"
 
 #include <cmath>
 #include <stdexcept>
@@ -13,6 +13,7 @@
 namespace json {
 
 using std::stringstream;
+using namespace automata;
 
 class number_parser : public df_automata<state> {
         friend class value_parser;

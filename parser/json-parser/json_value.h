@@ -59,8 +59,9 @@ static const json_null null;
 
 //// is_json_type helpers
 template<typename T> struct is_json_type : std::false_type { };
-template<json_type_flags F> struct ijt_base_ : std::true_type
-        { enum { type_flag = F }; };
+template<json_type_flags F> struct ijt_base_ : std::true_type {
+    static constexpr json_type_flags type_flag = F;
+};
 template<> struct is_json_type<json_string > : ijt_base_<json_type_string > { };
 template<> struct is_json_type<json_integer> : ijt_base_<json_type_integer> { };
 template<> struct is_json_type<json_real   > : ijt_base_<json_type_real   > { };
@@ -79,15 +80,16 @@ template<typename Data, typename Storage>
 struct json_type_trait_base_ {
         typedef Data data_type;
         typedef Storage storage_type;
-        enum {
-                type_flag = is_json_type<storage_type>::type_flag,
-                enabled = true,
-        };
+        static constexpr json_type_flags type_flag =
+            is_json_type<storage_type>::type_flag;
+        static constexpr bool enabled = true;
 };
 
 //// class json_type_trait : json_type_trait_base_
 template<typename T, typename Satisfy = void>
-struct json_type_trait { enum { enabled = false }; };
+struct json_type_trait {
+    static constexpr bool enabled = false;
+};
 
 template<typename T>
 struct json_type_trait<T,

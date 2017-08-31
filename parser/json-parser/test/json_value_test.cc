@@ -1,4 +1,4 @@
-// cflags: -o <dirname>/../build/json_value_test
+// cflags: -o <dirname>/json_value_test
 
 #include <iostream>
 

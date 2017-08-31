@@ -1,4 +1,4 @@
-// cflags: -o <dirname>/../build/parser_test
+// cflags: -o <dirname>/parser_test
 
 #include "../number_parser.h"
 #include "../string_parser.h"

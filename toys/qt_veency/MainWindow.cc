@@ -48,14 +48,14 @@ void MainWindow::triggeredGoConnect()
         return;
     }
 
-    static const char* serverHost = "127.0.0.1";
+    static const char* serverHost = "10.42.0.74";
     char* dyn_serverHost = (char*)malloc(sizeof(serverHost));
     strcpy(dyn_serverHost, serverHost);
 
     cl = rfbGetClient(8, 3, 4);
 
     cl->serverHost = dyn_serverHost;
-    cl->serverPort = 15900;
+    cl->serverPort = 5900;
     cl->GetPassword = getPassword;
 
     if(!rfbInitClient(cl, nullptr, nullptr)) {

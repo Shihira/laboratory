@@ -8,7 +8,6 @@
 #include <memory>
 
 #include "json_value.h"
-#include "df_automata.h"
 #include "number_parser.h"
 #include "string_parser.h"
 

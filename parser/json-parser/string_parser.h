@@ -5,11 +5,12 @@
  * Copyright (c) Shihira Fung, 2015
  */
 
-#include "df_automata.h"
+#include "../df_automata.h"
 
 namespace json {
 
 using std::stringstream;
+using namespace automata;
 
 class string_parser : public df_automata<state> {
 protected:

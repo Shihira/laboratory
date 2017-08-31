@@ -18,7 +18,7 @@ T safeAt(const Mat& inimg, int i, int j, T dflt)
     return gray;
 }
 
-void genFilter(const Mat& inimg, int i, int j,
+void genSamplingLine(const Mat& inimg, int i, int j,
         vector<Point>& min_rel, vector<Point>& max_rel)
 {
     assert(inimg.type() == CV_8U);
@@ -67,7 +67,7 @@ void genFilter(const Mat& inimg, int i, int j,
     }
 }
 
-void filterPrint(const Mat& inimg, Mat& outimg)
+void stripeFilter(const Mat& inimg, Mat& outimg)
 {
     assert(inimg.type() == CV_8U);
 
@@ -75,9 +75,9 @@ void filterPrint(const Mat& inimg, Mat& outimg)
 
     for(int i = 0; i < inimg.rows; i++)
     for(int j = 0; j < inimg.cols; j++) {
-        cout << i << ", " << j << endl;
+        //cout << i << ", " << j << endl;
         vector<Point> min_rel, max_rel;
-        genFilter(inimg, i, j, min_rel, max_rel);
+        genSamplingLine(inimg, i, j, min_rel, max_rel);
 
         float norm_aver = 0;
         for(Point p : min_rel) {
@@ -93,7 +93,7 @@ void filterPrint(const Mat& inimg, Mat& outimg)
         }
         tang_aver /= max_rel.size();
 
-        if(norm_aver >= tang_aver)
+        if(norm_aver > tang_aver)
             outimg.at<uint8_t>(i, j) = 255;
         else
             outimg.at<uint8_t>(i, j) = 0;
@@ -118,7 +118,7 @@ int getbool(const Mat& inimg, int i, int j, size_t ord)
     return gray ? 1 : 0;
 }
 
-void skeletionization(const Mat& inimg, Mat& outimg)
+void skeletonization(const Mat& inimg, Mat& outimg)
 {
     assert(inimg.type() == CV_8U);
 
@@ -172,6 +172,7 @@ void skeletionization(const Mat& inimg, Mat& outimg)
     }
 }
 
+/*
 void onMouse(int event, int x, int y, int, void* img_v)
 {
     Mat& img = *(Mat*)img_v;
@@ -183,43 +184,87 @@ void onMouse(int event, int x, int y, int, void* img_v)
         return;
 
     vector<Point> min_rel, max_rel;
-    genFilter(img, y, x, min_rel, max_rel);
+    genSamplingLine(img, y, x, min_rel, max_rel);
     for(Point& p : min_rel) {
         img2.at<uint8_t>(y + p.y, x + p.x) = 0;
     }
 
     imshow("Skeletonization", img2);
 }
+*/
 
-int main()
+void eliminateHoles(const Mat& inimg, Mat& outimg, int r, size_t c)
+{
+    for(int i = 0; i < inimg.rows; i++)
+    for(int j = 0; j < inimg.cols; j++) {
+        size_t sum = 0;
+
+        for(int dy = -r; dy <= r; dy++)
+        for(int dx = -r; dx <= r; dx++) {
+            uint8_t val = safeAt<uint8_t>(inimg, i + dy, j + dx, 0);
+            if(val < 128) sum += 1;
+        }
+
+        if(sum >= c)
+            outimg.at<uint8_t>(i, j) = 0;
+        else
+            outimg.at<uint8_t>(i, j) = inimg.at<uint8_t>(i, j);
+    }
+}
+
+int main(int argc, char** argv)
 {
     namedWindow("Skeletonization");
 
-    Mat img = imread("skelet-out-4.jpg");
+    if(argc < 4) {
+        cout << "USAGE:\n" << endl
+             << "    ./skeletonization <stage_name> <inimg> <outimg>\n"
+             << "STAGES:\n"
+             << "    stripefilter gaussian elimhole skeleton" << endl;
+        return -1;
+    }
+
+    Mat img = imread(argv[2]);
     Mat img1(img.rows, img.cols, CV_8U),
         img2(img.rows, img.cols, CV_8U);
 
-    //setMouseCallback("Skeletonization", onMouse, &img1);
+    cvtColor(img, img1, CV_RGB2GRAY);
 
     int key = 0;
-    size_t thers = 128;
+
     do {
+        if(string(argv[1]) == "stripefilter") {
+            stripeFilter(img1, img2);
+        }
+
+        if(string(argv[1]) == "gaussian") {
+            GaussianBlur(img1, img2, Size(5, 5), 0, 0);
+        }
+
+        if(string(argv[1]) == "elimhole") {
+            eliminateHoles(img1, img2, 1, 4);
+            eliminateHoles(img2, img1, 2, 12);
+            eliminateHoles(img1, img2, 1, 4);
+            //medianBlur(img1, img2, 3);
+            //morphologyEx(img1, img2, MORPH_OPEN, Mat(2,2, CV_8U), Point(-1,-1), 1);
+        }
+
+        if(string(argv[1]) == "skeleton") {
+            cv::subtract(cv::Scalar::all(255), img1, img2);
+            threshold(img2, img1, 128, 255, CV_THRESH_BINARY);
+            skeletonization(img1, img2);
+        }
+        /*
+        cout << key << endl;
         if(key == 1113938)
             thers += thers == 0xff ? 0 : 1;
         if(key == 1113940)
             thers -= thers == 0x00 ? 0 : 1;
         cout << "Thershold: " << thers << endl;
+        */
 
-        cvtColor(img, img1, CV_RGB2GRAY);
-        //GaussianBlur(img1, img2, Size(3, 3), 0, 0);
-        //morphologyEx(img1, img2, MORPH_OPEN, Mat(2,2, CV_8U), Point(-1,-1), 1);
-        threshold(img1, img2, thers, 255, THRESH_BINARY_INV);
-        skeletionization(img2, img1);
-        //filterPrint(img1, img2);
-        //medianBlur(img2, img1, 5);
-
-        imshow("Skeletonization", img1);
-        imwrite("skelet-out-5.jpg", img1);
+        imshow("Skeletonization", img2);
+        imwrite(argv[3], img2);
     } while((key = waitKey(0)) > 0);
     destroyWindow("Skeletonization");
 }

@@ -10,14 +10,18 @@ from functools import reduce
 
 #### Options
 USERNAME = "Shihira"
-VERSION = "1.7.10-Forge10.13.3.1388-1.7.10"
-#VERSION = "1.7.10"
+VERSION = ""
 GAMEDIR = ".minecraft"
-JAVA_PATH = "/usr/java/jdk1.7.0_79/bin/java"
+JAVA_PATH = "java"
+#JAVA_PATH = "/usr/lib/jvm/java-7-openjdk/bin/java"
 PLATFORM = platform.system().lower()
 MEMORY = 1024
 
 #### DO NOT MODIFY
+
+if not VERSION:
+    # use the latest
+    VERSION = sorted(listdir(path.join(GAMEDIR, "versions")))[-1]
 
 JAVA_ARGS = [
         "-Xmx%dm" % MEMORY,
@@ -35,10 +39,11 @@ class MinecraftArguments:
             "game_directory": None,
             "assets_root": None,
             "assets_index_name": None,
-            "auth_uuid": "null",
-            "auth_access_token": "null",
+            "auth_uuid": "{}",
+            "auth_access_token": "{}",
             "user_properties": "{}",
             "user_type": "{}",
+            "version_type": "{}",
         }
 
     def __init__(self):
@@ -58,35 +63,48 @@ class Version:
         lib_dir_list = lib_dir_list[0].split(".") + lib_dir_list[1:]
         lib_dir_list = [GAMEDIR, "libraries"] + lib_dir_list
 
-        # proper version
-        lib_version, lib_dir_list = lib_dir_list[-1], lib_dir_list[:-1]
-        lib_ava_ver = listdir(path.sep.join(lib_dir_list))
-        if lib_version not in lib_ava_ver:
-            print("[WARNING] %s-%s is not found for. Use %s instead." %
-                    (".".join(lib_dir_list[2:]), lib_version, lib_ava_ver[0]))
-            lib_version = lib_ava_ver[0]
-        lib_dir = path.sep.join(lib_dir_list + [lib_version])
+        try:
+            # proper version
+            lib_version, lib_dir_list = lib_dir_list[-1], lib_dir_list[:-1]
+            lib_ava_ver = listdir(path.sep.join(lib_dir_list))
+            if lib_version not in lib_ava_ver:
+                print("[WARNING] %s-%s is not found for. Use %s instead." %
+                        (".".join(lib_dir_list[2:]), lib_version, lib_ava_ver[0]))
+                lib_version = lib_ava_ver[0]
+            lib_dir = path.sep.join(lib_dir_list + [lib_version])
 
-        # proper platform
-        jar_ava_ver = listdir(lib_dir)
-        jar_version = jar_ava_ver[0]
-        jar_plat_var = list(filter(lambda j: PLATFORM in j, jar_ava_ver))
-        if jar_plat_var: jar_version = jar_plat_var[0]
+            jar_ava_ver = listdir(lib_dir)
+            jar_version = jar_ava_ver[0]
 
-        lib_path = path.join(lib_dir, jar_version)
-        return lib_path
+            lib_path = path.join(lib_dir, jar_version)
+
+            return [lib_path]
+        except Exception as e:
+            print("[ERROR] cannot handle with library %s" % name)
+
+            return []
 
     def get_single_version_libraries(self):
         libraries = []
 
         for lib in self.profile["libraries"]:
-            libraries += [self.select_library(lib["name"])]
+            libraries += self.select_library(lib["name"])
 
         return libraries
 
-    def get_jar(self):
-        jar = path.join(self.version_dir, self.version_name + ".jar")
-        return jar if path.isfile(jar) else ""
+    def get_version_main_jar(self):
+        main_jar_version = ""
+        if "jar" in self.profile:
+            main_jar_version = self.profile["jar"]
+        else:
+            main_jar_version = self.version_name
+
+        jar = path.join(self.version_dir, "..", main_jar_version, main_jar_version + ".jar")
+
+        if not path.isfile(jar):
+            print("[ERROR] Unable to locate main jar " + jar)
+
+        return jar
 
     def __init__(self, version_name):
         self.version_name = version_name
@@ -94,13 +112,18 @@ class Version:
         self.profile = json.load(open(path.join(
             self.version_dir, version_name + ".json")))
 
-    def get_libraries(self):
-        libraries = self.get_single_version_libraries()
-        libraries += [self.get_jar()]
-
         if "inheritsFrom" in self.profile:
             parent_version = Version(self.profile["inheritsFrom"])
-            libraries += parent_version.get_libraries()
+
+            for k, v in parent_version.profile.items():
+                if isinstance(v, list) and k in self.profile:
+                    self.profile[k] += v
+                elif k not in self.profile:
+                    self.profile[k] = v
+
+    def get_libraries(self):
+        libraries = self.get_single_version_libraries()
+        libraries += [self.get_version_main_jar()]
 
         return libraries
 
